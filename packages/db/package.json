@@ -1,0 +1,32 @@
+{
+  "name": "@stack-pbx/db",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "db:push": "bunx drizzle-kit push",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:studio": "bunx drizzle-kit studio",
+    "db:migrate": "bunx drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@stack-pbx/env": "workspace:*",
+    "dotenv": "catalog:",
+    "drizzle-orm": "catalog:",
+    "pg": "^8.17.1",
+    "ulid": "^3.0.2",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@stack-pbx/config": "workspace:*",
+    "@types/pg": "catalog:",
+    "drizzle-kit": "^0.31.8",
+    "typescript": "catalog:"
+  }
+}

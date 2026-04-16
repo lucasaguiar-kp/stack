@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+.git
+.turbo
+dist
+**/dist
+coverage
+**/.vite
+**/.DS_Store
+infra/asterisk/log
+infra/asterisk/spool
+infra/mosquitto/data
+infra/mosquitto/log

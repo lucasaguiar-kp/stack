@@ -1,0 +1,20 @@
+{
+  "ignorePatterns": [],
+  "sortPackageJson": true,
+  "sortImports": {
+    "newlinesBetween": false,
+    "groups": [
+      ["value-builtin", "value-external"],
+      ["value-internal", "value-parent", "value-sibling", "value-index"],
+      { "newlinesBetween": false },
+      "type-import",
+      "unknown"
+    ]
+  },
+  "sortTailwindcss": {
+    "attributes": ["class", "className"],
+    "functions": ["clsx", "cn"],
+    "preserveDuplicates": false,
+    "preserveWhitespace": false
+  }
+}

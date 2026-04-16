@@ -1,0 +1,18 @@
+{
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "always",
+    "source.organizeImports.oxc": "explicit"
+  },
+  "chat.tools.terminal.autoApprove": {
+    "bun": true,
+    "bunx": true,
+    "npx -y @tanstack/router-cli": true,
+    "docker run": true,
+    "docker exec": true,
+    "docker compose": true
+  }
+}

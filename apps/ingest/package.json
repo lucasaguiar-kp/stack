@@ -1,0 +1,23 @@
+{
+  "name": "ingest",
+  "private": true,
+  "type": "module",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "bun run --hot src/server.ts",
+    "build": "bun build --compile --minify --sourcemap --bytecode ./src/server.ts --outfile ingest",
+    "start": "bun run src/server.ts"
+  },
+  "dependencies": {
+    "@stack-pbx/db": "workspace:*",
+    "@stack-pbx/env": "workspace:*",
+    "dotenv": "catalog:",
+    "drizzle-orm": "catalog:",
+    "mqtt": "^5.12.1"
+  },
+  "devDependencies": {
+    "@stack-pbx/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

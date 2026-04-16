@@ -1,0 +1,66 @@
+{
+  "name": "stack-pbx",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "dotenv": "^17.2.2",
+      "zod": "^4.1.13",
+      "typescript": "^5",
+      "@types/bun": "^1.3.4",
+      "hono": "^4.8.2",
+      "@orpc/server": "^1.12.2",
+      "@orpc/openapi": "^1.12.2",
+      "@orpc/zod": "^1.12.2",
+      "better-auth": "1.5.2",
+      "@orpc/tanstack-query": "^1.12.2",
+      "@orpc/client": "^1.12.2",
+      "@better-auth/expo": "1.5.2",
+      "@tanstack/react-query": "^5.90.12",
+      "@types/nodemailer": "^6.4.17",
+      "drizzle-orm": "^0.45.1",
+      "@tanstack/react-form": "^1.28.0",
+      "nodemailer": "^7.0.6",
+      "@types/pg": "^8.16.0"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "docker:dev:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @stack-pbx/db db:push",
+    "db:studio": "turbo -F @stack-pbx/db db:studio",
+    "db:generate": "turbo -F @stack-pbx/db db:generate",
+    "db:migrate": "turbo -F @stack-pbx/db db:migrate",
+    "db:start": "turbo -F @stack-pbx/db db:start",
+    "db:watch": "turbo -F @stack-pbx/db db:watch",
+    "db:stop": "turbo -F @stack-pbx/db db:stop",
+    "db:down": "turbo -F @stack-pbx/db db:down",
+    "check": "oxlint && oxfmt --write"
+  },
+  "dependencies": {
+    "@stack-pbx/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@stack-pbx/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "oxfmt": "^0.36.0",
+    "oxlint": "^1.51.0",
+    "turbo": "^2.8.14",
+    "typescript": "catalog:"
+  },
+  "packageManager": "bun@1.3.9"
+}

@@ -1,0 +1,3 @@
+{
+  "extends": "@stack-pbx/config/tsconfig.base.json"
+}

@@ -1,0 +1,138 @@
+name: khomp-pabx
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stack-pbx
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - khomp_pabx_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  emqx:
+    image: emqx/emqx:latest
+    restart: unless-stopped
+    hostname: emqx
+    entrypoint: ["/bin/sh", "/opt/emqx/bin/bootstrap-auth.sh"]
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "8084:8084"
+      - "8883:8883"
+      - "18083:18083"
+    environment:
+      EMQX_NAME: khomp-pabx-emqx
+      EMQX_HOST: emqx
+      MQTT_BROKER_USERNAME: ${MQTT_BROKER_USERNAME:-}
+      MQTT_BROKER_PASSWORD: ${MQTT_BROKER_PASSWORD:-}
+    volumes:
+      - ../../infra/emqx/bootstrap-auth.sh:/opt/emqx/bin/bootstrap-auth.sh:ro
+      - khomp_pabx_emqx_data:/opt/emqx/data
+      - khomp_pabx_emqx_log:/opt/emqx/log
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  asterisk:
+    image: andrius/asterisk:22
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+      - SYS_RESOURCE
+    ports:
+      - "5038:5038"
+      - "5060:5060/tcp"
+      - "5060:5060/udp"
+      - "8088:8088"
+      - "10000-10100:10000-10100/udp"
+    volumes:
+      - ../../infra/asterisk/config/asterisk.conf:/etc/asterisk/asterisk.conf:ro
+      - ../../infra/asterisk/config/extensions.conf:/etc/asterisk/extensions.conf:ro
+      - ../../infra/asterisk/config/http.conf:/etc/asterisk/http.conf:ro
+      - ../../infra/asterisk/config/logger.conf:/etc/asterisk/logger.conf:ro
+      - ../../infra/asterisk/config/manager.conf:/etc/asterisk/manager.conf:ro
+      - ../../infra/asterisk/config/modules.conf:/etc/asterisk/modules.conf:ro
+      - ../../infra/asterisk/config/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ../../infra/asterisk/config/rtp.conf:/etc/asterisk/rtp.conf:ro
+      - ../../infra/asterisk/generated:/etc/asterisk/generated
+      - khomp_pabx_asterisk_data:/var/lib/asterisk
+      - ../../infra/asterisk/log:/var/log/asterisk
+      - ../../infra/asterisk/spool:/var/spool/asterisk
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "asterisk", "-rx", "core show uptime seconds"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  server:
+    image: ${SERVER_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: ${DOCKER_DATABASE_URL}
+      MQTT_BROKER_HOST: ${DOCKER_MQTT_BROKER_HOST}
+      ASTERISK_AMI_HOST: ${DOCKER_ASTERISK_AMI_HOST}
+      ASTERISK_GENERATED_PJSIP_DIR: ${DOCKER_ASTERISK_GENERATED_PJSIP_DIR}
+      ASTERISK_GENERATED_EXTENSIONS_DIR: ${DOCKER_ASTERISK_GENERATED_EXTENSIONS_DIR}
+    volumes:
+      - ../../infra/asterisk/generated:/app/infra/asterisk/generated
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+      asterisk:
+        condition: service_healthy
+
+  ingest:
+    image: ${INGEST_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL}
+      MQTT_BROKER_HOST: ${DOCKER_MQTT_BROKER_HOST}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+      server:
+        condition: service_started
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    ports:
+      - "3001:3001"
+    depends_on:
+      server:
+        condition: service_started
+
+volumes:
+  khomp_pabx_postgres_data:
+  khomp_pabx_asterisk_data:
+  khomp_pabx_emqx_data:
+  khomp_pabx_emqx_log:

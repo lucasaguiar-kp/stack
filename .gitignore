@@ -1,0 +1,69 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+dist
+build
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env*.local
+
+# IDEs and editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Turbo
+.turbo
+
+# Better-T-Stack
+.alchemy
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.tgz
+.cache
+tmp
+temp
+
+# Local PBX infrastructure runtime files
+infra/asterisk/generated/**
+!infra/asterisk/generated/.gitkeep
+!infra/asterisk/generated/pjsip/.gitkeep
+!infra/asterisk/generated/pjsip/devices/.gitkeep
+!infra/asterisk/generated/extensions/.gitkeep
+!infra/asterisk/generated/extensions/groups/.gitkeep
+infra/asterisk/log/**
+!infra/asterisk/log/.gitkeep
+infra/asterisk/spool/**
+!infra/asterisk/spool/.gitkeep
+infra/mosquitto/data/**
+!infra/mosquitto/data/.gitkeep
+infra/mosquitto/log/**
+!infra/mosquitto/log/.gitkeep
+
+.claude
+.github

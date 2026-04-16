@@ -1,0 +1,27 @@
+services:
+  server:
+    command: ["bun", "run", "--cwd", "apps/server", "dev:docker"]
+    volumes:
+      - ./apps/server:/app/apps/server
+      - ./packages:/app/packages
+      - ./package.json:/app/package.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./infra/asterisk/generated:/app/infra/asterisk/generated
+
+  ingest:
+    command: ["bun", "run", "--cwd", "apps/ingest", "dev"]
+    volumes:
+      - ./apps/ingest:/app/apps/ingest
+      - ./packages:/app/packages
+      - ./package.json:/app/package.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+
+  web:
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "300"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages:/app/packages
+      - ./package.json:/app/package.json:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
