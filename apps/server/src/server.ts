@@ -15,6 +15,8 @@ import { logger } from "hono/logger";
 import { auth } from "./auth";
 import { createContext } from "./context";
 import { handleError } from "./core/http/error-handler";
+import { multicastEvents } from "./modules/device-groups/_shared/multicast-events";
+import type { MulticastStatusEvent } from "./modules/device-groups/_shared/multicast-events";
 import { uploadDeviceAudio } from "./modules/devices/upload-device-audio/service";
 import { appRouter } from "./router";
 import type { Server, ServerWebSocket } from "bun";
@@ -29,6 +31,19 @@ type DevicePresenceEvent = {
 
 const app = new Hono();
 const devicePresenceClients = new Set<ServerWebSocket<unknown>>();
+
+function broadcastToClients(payload: unknown) {
+  const message = JSON.stringify(payload);
+  for (const client of devicePresenceClients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  }
+}
+
+multicastEvents.on("status", (event: MulticastStatusEvent) => {
+  broadcastToClients(event);
+});
 
 const ACCEPTED_AUDIO_MIME_TYPES = new Set([
   "application/octet-stream",
@@ -67,13 +82,7 @@ function isAcceptedAudioFile(file: File) {
 }
 
 function broadcastDevicePresenceEvent(event: DevicePresenceEvent) {
-  const message = JSON.stringify(event);
-
-  for (const client of devicePresenceClients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
-    }
-  }
+  broadcastToClients(event);
 }
 
 app.use(logger());

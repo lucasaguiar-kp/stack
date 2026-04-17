@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { env } from "@stack-pbx/env/web";
-import { queryClient } from "@/utils/orpc";
+import { orpc, queryClient } from "@/utils/orpc";
 
 type DevicePresenceEvent = {
   connectionStatus: "online" | "offline" | "unknown";
@@ -8,6 +8,12 @@ type DevicePresenceEvent = {
   mqttTopic: string;
   occurredAt: string;
   type: "device.connection-status.changed";
+};
+
+type MulticastStatusEvent = {
+  type: "multicast.status.changed";
+  groupId: string;
+  running: boolean;
 };
 
 function buildDevicePresenceWebSocketUrl() {
@@ -30,17 +36,22 @@ export function DevicePresenceSync() {
 
       socket.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data) as DevicePresenceEvent;
+          const payload = JSON.parse(event.data) as DevicePresenceEvent | MulticastStatusEvent;
 
-          if (payload.type !== "device.connection-status.changed") {
+          if (payload.type === "device.connection-status.changed") {
+            void queryClient.invalidateQueries({
+              predicate: (query) => JSON.stringify(query.queryKey).includes("device"),
+            });
             return;
           }
 
-          void queryClient.invalidateQueries({
-            predicate: (query) => JSON.stringify(query.queryKey).includes("device"),
-          });
+          if (payload.type === "multicast.status.changed") {
+            void queryClient.invalidateQueries(
+              orpc.group.multicast.status.queryOptions({ input: { groupId: payload.groupId } }),
+            );
+          }
         } catch (error) {
-          console.error("Failed to parse device presence event", error);
+          console.error("Failed to parse WebSocket event", error);
         }
       };
 

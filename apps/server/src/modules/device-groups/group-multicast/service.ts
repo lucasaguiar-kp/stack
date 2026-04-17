@@ -11,12 +11,12 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { AppError } from "../../../core/errors/app-error";
+import { allocateMulticastAddress } from "../../users/_shared/pbx";
 import { sendDeviceMqttRequest } from "../../devices/_shared/device-mqtt-client";
 import {
   getMulticastStreamStatus,
   startMulticastStream,
   stopMulticastStream,
-  MULTICAST_RTP_PORT,
 } from "../_shared/multicast-stream-manager";
 import type {
   GetGroupMulticastStatusInput,
@@ -26,7 +26,7 @@ import type {
   UpdateGroupMulticastConfigInput,
 } from "./schema";
 
-async function getAuthorizedGroupOrThrow(groupId: string, requesterId: string) {
+async function getGroupOrThrow(groupId: string, requesterId: string) {
   const group = await db.query.deviceGroup.findFirst({
     where: and(eq(deviceGroupTable.id, groupId), eq(deviceGroupTable.userId, requesterId)),
   });
@@ -35,11 +35,24 @@ async function getAuthorizedGroupOrThrow(groupId: string, requesterId: string) {
     throw new AppError("DEVICE_GROUP_NOT_FOUND");
   }
 
-  if (!group.multicastAddress) {
-    throw new AppError("MULTICAST_ADDRESS_NOT_ALLOCATED");
+  return group;
+}
+
+async function ensureMulticastAddress(groupId: string, requesterId: string) {
+  const group = await getGroupOrThrow(groupId, requesterId);
+
+  if (group.multicastAddress) {
+    return group as typeof group & { multicastAddress: string };
   }
 
-  return group as typeof group & { multicastAddress: string };
+  const multicastAddress = await allocateMulticastAddress();
+
+  await db
+    .update(deviceGroupTable)
+    .set({ multicastAddress })
+    .where(eq(deviceGroupTable.id, groupId));
+
+  return { ...group, multicastAddress };
 }
 
 async function sendMulticastMqttToDevices(
@@ -101,7 +114,7 @@ async function writeAudioTempFile(base64Data: string, fileName: string): Promise
 }
 
 export async function updateGroupMulticastConfig(input: UpdateGroupMulticastConfigInput) {
-  await getAuthorizedGroupOrThrow(input.groupId, input.requesterId);
+  await ensureMulticastAddress(input.groupId, input.requesterId);
 
   const existing = await db.query.deviceGroupMulticastConfig.findFirst({
     where: eq(multicastConfigTable.groupId, input.groupId),
@@ -126,7 +139,7 @@ export async function updateGroupMulticastConfig(input: UpdateGroupMulticastConf
 }
 
 export async function startGroupMulticast(input: StartGroupMulticastInput) {
-  const group = await getAuthorizedGroupOrThrow(input.groupId, input.requesterId);
+  const group = await ensureMulticastAddress(input.groupId, input.requesterId);
 
   const config = await db.query.deviceGroupMulticastConfig.findFirst({
     where: eq(multicastConfigTable.groupId, input.groupId),
@@ -164,7 +177,7 @@ export async function startGroupMulticast(input: StartGroupMulticastInput) {
 }
 
 export async function stopGroupMulticast(input: StopGroupMulticastInput) {
-  const group = await getAuthorizedGroupOrThrow(input.groupId, input.requesterId);
+  const group = await ensureMulticastAddress(input.groupId, input.requesterId);
 
   stopMulticastStream(input.groupId);
 
@@ -174,7 +187,7 @@ export async function stopGroupMulticast(input: StopGroupMulticastInput) {
 export async function getGroupMulticastStatus(
   input: GetGroupMulticastStatusInput,
 ): Promise<GroupMulticastStatusOutput> {
-  const group = await getAuthorizedGroupOrThrow(input.groupId, input.requesterId);
+  const group = await getGroupOrThrow(input.groupId, input.requesterId);
 
   const status = getMulticastStreamStatus(input.groupId);
 
@@ -184,14 +197,14 @@ export async function getGroupMulticastStatus(
 
   return {
     running: status.running,
-    address: group.multicastAddress,
+    address: group.multicastAddress ?? null,
     config: config
       ? {
           groupId: input.groupId,
           sourceType: config.sourceType,
           sourceUrl: config.sourceUrl ?? null,
           audioFileName: config.audioFileName ?? null,
-          participantDeviceIds: config.participantDeviceIds,
+          participantDeviceIds: config.participantDeviceIds ?? [],
         }
       : null,
   };

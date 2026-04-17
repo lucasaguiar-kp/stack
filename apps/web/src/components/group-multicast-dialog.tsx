@@ -53,7 +53,6 @@ export function GroupMulticastDialog({ open, onOpenChange, groupId }: Props) {
   const status = useQuery({
     ...orpc.group.multicast.status.queryOptions({ input: { groupId } }),
     enabled: open && Boolean(groupId),
-    refetchInterval: 5000,
   });
 
   useEffect(() => {
@@ -140,7 +139,7 @@ export function GroupMulticastDialog({ open, onOpenChange, groupId }: Props) {
           </DialogTitle>
           <DialogDescription>
             {status.data?.address
-              ? `Endereço: ${status.data.address}:5004`
+              ? `Endereço: ${status.data.address}:16384`
               : "Configure e inicie o stream de áudio para os dispositivos do grupo."}
           </DialogDescription>
         </DialogHeader>

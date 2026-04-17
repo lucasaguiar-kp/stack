@@ -1,6 +1,11 @@
 services:
   server:
+    network_mode: host
     command: ["bun", "run", "--cwd", "apps/server", "dev:docker"]
+    environment:
+      DATABASE_URL: ${DEV_DATABASE_URL}
+      MQTT_BROKER_HOST: ${DEV_MQTT_BROKER_HOST}
+      ASTERISK_AMI_HOST: ${DEV_ASTERISK_AMI_HOST}
     volumes:
       - ./apps/server:/app/apps/server
       - ./packages:/app/packages
@@ -10,6 +15,8 @@ services:
 
   ingest:
     command: ["bun", "run", "--cwd", "apps/ingest", "dev"]
+    environment:
+      INTERNAL_SERVER_URL: ${DEV_INTERNAL_SERVER_URL}
     volumes:
       - ./apps/ingest:/app/apps/ingest
       - ./packages:/app/packages

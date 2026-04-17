@@ -16,7 +16,9 @@ import { listDevicesRoute } from "./modules/devices/list-devices/route";
 import { syncDeviceRoute } from "./modules/devices/sync-device/route";
 import { updateDeviceRoute } from "./modules/devices/update-device/route";
 import { updateDeviceConfigRoute } from "./modules/devices/update-device-config/route";
+import { getUserConnectionInfoRoute } from "./modules/users/get-connection-info/route";
 import { getUserPbxCredentialsRoute } from "./modules/users/get-pbx-credentials/route";
+import { getSetupStatusRoute } from "./modules/users/get-setup-status/route";
 import { publicProcedure } from "./procedures";
 import type { RouterClient } from "@orpc/server";
 
@@ -24,8 +26,12 @@ export const appRouter = {
   healthCheck: publicProcedure.handler(() => {
     return "OK";
   }),
+  setup: {
+    status: getSetupStatusRoute,
+  },
   user: {
     pbxCredentials: getUserPbxCredentialsRoute,
+    connectionInfo: getUserConnectionInfoRoute,
   },
   group: {
     create: createDeviceGroupRoute,
