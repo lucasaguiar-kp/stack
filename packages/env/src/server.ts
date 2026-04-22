@@ -46,6 +46,17 @@ const rawEnv = createEnv({
     ASTERISK_PJSIP_TRANSPORT: z.string().min(1).default("transport-udp"),
     ASTERISK_GENERATED_PJSIP_DIR: z.string().min(1).optional(),
     ASTERISK_GENERATED_EXTENSIONS_DIR: z.string().min(1).optional(),
+    MULTICAST_ADDRESS_BASE: z
+      .string()
+      .regex(/^\d{1,3}\.\d{1,3}\.\d{1,3}$/)
+      .default("224.0.0"),
+    MULTICAST_ADDRESS_START: z.coerce.number().int().min(0).max(255).default(1),
+    MULTICAST_ADDRESS_MAX: z.coerce.number().int().min(0).max(255).default(254),
+    MULTICAST_RELAY_HOST: z.string().min(1).optional(),
+    MULTICAST_RELAY_PORT: z.coerce.number().int().positive().optional(),
+    MULTICAST_LOCAL_ADDR: z.string().min(1).optional(),
+    MULTICAST_TTL: z.coerce.number().int().min(1).max(255).default(32),
+    MULTICAST_RTP_PAYLOAD_SIZE: z.coerce.number().int().positive().default(160),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

@@ -5,7 +5,6 @@ import {
   deviceGroupMulticastConfig as multicastConfigTable,
 } from "@stack-pbx/db/schema/index";
 import { and, eq } from "drizzle-orm";
-import ffmpeg from "fluent-ffmpeg";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
@@ -90,27 +89,8 @@ async function writeAudioTempFile(base64Data: string, fileName: string): Promise
   const tempId = randomUUID();
   const ext = path.extname(fileName) || ".wav";
   const tempInputPath = path.join(tmpdir(), `multicast-in-${tempId}${ext}`);
-  const tempOutputPath = path.join(tmpdir(), `multicast-out-${tempId}.wav`);
-
   await fs.writeFile(tempInputPath, Buffer.from(base64Data, "base64"));
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      ffmpeg(tempInputPath)
-        .output(tempOutputPath)
-        .toFormat("wav")
-        .audioCodec("pcm_s16le")
-        .audioFrequency(8000)
-        .audioChannels(1)
-        .on("end", () => resolve())
-        .on("error", (err: Error) => reject(err))
-        .run();
-    });
-  } finally {
-    await fs.unlink(tempInputPath).catch(() => undefined);
-  }
-
-  return tempOutputPath;
+  return tempInputPath;
 }
 
 export async function updateGroupMulticastConfig(input: UpdateGroupMulticastConfigInput) {

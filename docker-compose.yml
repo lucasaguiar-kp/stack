@@ -98,6 +98,7 @@ services:
       context: .
       dockerfile: Dockerfile.server
     container_name: stack-pbx-server
+    network_mode: host
     working_dir: /app
     command: ["bun", "run", "--cwd", "apps/server", "start:docker"]
     env_file:
@@ -105,15 +106,13 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
-      DATABASE_URL: ${DOCKER_DATABASE_URL}
-      MQTT_BROKER_HOST: ${DOCKER_MQTT_BROKER_HOST}
-      ASTERISK_AMI_HOST: ${DOCKER_ASTERISK_AMI_HOST:-asterisk}
+      DATABASE_URL: ${DEV_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/stack-pbx}
+      MQTT_BROKER_HOST: ${DEV_MQTT_BROKER_HOST:-localhost}
+      ASTERISK_AMI_HOST: ${DEV_ASTERISK_AMI_HOST:-localhost}
       ASTERISK_GENERATED_PJSIP_DIR: ${DOCKER_ASTERISK_GENERATED_PJSIP_DIR}
       ASTERISK_GENERATED_EXTENSIONS_DIR: ${DOCKER_ASTERISK_GENERATED_EXTENSIONS_DIR}
     volumes:
       - ./infra/asterisk/generated:/app/infra/asterisk/generated
-    ports:
-      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy

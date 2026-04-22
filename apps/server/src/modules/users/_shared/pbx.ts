@@ -1,10 +1,8 @@
 import { db } from "@stack-pbx/db";
+import { env } from "@stack-pbx/env/server";
 
 const USER_EXTENSION_START = 90000;
 const GROUP_EXTENSION_START = 70000;
-const MULTICAST_ADDRESS_BASE = "239.0.0";
-const MULTICAST_ADDRESS_START = 1;
-const MULTICAST_ADDRESS_MAX = 254;
 
 function buildUsedExtensions(values: Array<string | null | undefined>) {
   const used = new Set<string>();
@@ -85,8 +83,8 @@ export async function allocateMulticastAddress(): Promise<string> {
     groups.map((g) => g.multicastAddress).filter(Boolean) as string[],
   );
 
-  for (let i = MULTICAST_ADDRESS_START; i <= MULTICAST_ADDRESS_MAX; i++) {
-    const candidate = `${MULTICAST_ADDRESS_BASE}.${i}`;
+  for (let i = env.MULTICAST_ADDRESS_START; i <= env.MULTICAST_ADDRESS_MAX; i++) {
+    const candidate = `${env.MULTICAST_ADDRESS_BASE}.${i}`;
     if (!used.has(candidate)) {
       return candidate;
     }
