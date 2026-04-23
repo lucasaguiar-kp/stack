@@ -37,6 +37,7 @@
     "docker:dev:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
     "docker:dev:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans",
     "dev:native": "turbo -F native dev",
+    "dev:multicast-agent": "turbo -F multicast-agent dev",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
     "db:push": "turbo -F @stack-pbx/db db:push",

@@ -1,0 +1,24 @@
+{
+  "name": "multicast-agent",
+  "private": true,
+  "type": "module",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "bun run --hot src/server.ts",
+    "build": "bun build --compile --minify --sourcemap --bytecode ./src/server.ts --outfile multicast-agent",
+    "check-types": "tsc -b",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@stack-pbx/env": "workspace:*",
+    "@orpc/server": "catalog:",
+    "dotenv": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@stack-pbx/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}
