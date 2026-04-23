@@ -26,6 +26,16 @@ Entregar o `Khomp Stack` como um produto Windows instalado por um unico executav
 - suporte tanto a transmissao por arquivo local quanto por radio/stream URL;
 - envio multicast executado nativamente no host Windows, sem dependencia de Docker para a etapa RTP.
 
+## Current Delivery Status
+
+O alvo de design continua sendo a suite local completa acima. Porem, a rodada executada neste repo ainda esta um passo antes disso no empacotamento Windows:
+
+- o instalador versionado nesta etapa registra automaticamente apenas `KhompStack-Backend`, `KhompStack-Ingest` e `KhompStack-MulticastAgent`;
+- `Asterisk`, `MQTT` e `Postgres` seguem no layout-alvo da suite local, mas ainda nao possuem wrappers/registro automatico versionados no mesmo fluxo;
+- o shell Electron e os assets empacotados do desktop ja existem no repo, mas o payload final `Khomp Stack Desktop.exe` ainda precisa ser produzido antes de alimentar o `.iss`.
+
+Ou seja: a arquitetura-alvo permanece a mesma, mas o artefato de instalacao entregue nesta rodada representa a primeira fase do empacotamento Windows, nao a suite completa final.
+
 ## Non-Goals
 
 Este design nao cobre:
@@ -121,7 +131,7 @@ Essa separacao permite atualizacao de binarios sem sobrescrever configuracoes e 
 
 ## Windows Services
 
-Servicos registrados:
+Servicos alvo da suite completa:
 
 - `KhompStack-Postgres`
 - `KhompStack-MQTT`
@@ -131,6 +141,16 @@ Servicos registrados:
 - `KhompStack-MulticastAgent`
 
 O `Khomp Stack Desktop` nao precisa ser um servico. Ele e apenas a superficie interativa.
+
+### Current installer coverage
+
+O instalador versionado nesta rodada registra automaticamente apenas:
+
+- `KhompStack-Backend`
+- `KhompStack-Ingest`
+- `KhompStack-MulticastAgent`
+
+`Postgres`, `MQTT` e `Asterisk` continuam no desenho final da suite, mas ainda nao entram como servicos provisionados pelo instalador atual.
 
 ### Boot order
 
@@ -258,7 +278,15 @@ Essa separacao evita duplicacao de responsabilidade entre `Ingest` e `Multicast 
 - iniciar transmissao por arquivo local e verificar reproducao em device;
 - iniciar transmissao por radio URL e verificar reproducao em device;
 - parar transmissao e confirmar limpeza de estado;
-- validar logs e recuperacao apos falha.
+
+## Implementation Notes
+
+- O primeiro empacotamento Windows ficou estruturado em torno de um bundle de staging em `dist/windows/bundle`, espelhando diretamente a arvore final em `C:\Program Files\Khomp Stack`. O instalador Inno Setup consome esse bundle pronto em vez de compilar binarios durante a instalacao.
+- O `Khomp Stack Desktop` ja possui shell Electron e renderer copiado para `apps/native/dist/renderer`, mas o runtime final do Electron ainda precisa ser empacotado antes do `.iss`. Na pratica, o instalador espera um payload portatil pronto em `bundle\app\Khomp Stack Desktop.exe`.
+- O fluxo de servicos em Windows foi fechado em torno de `ProgramData\Khomp Stack\config\service-runtime.env`. O `bootstrap-config.ps1` gera e preserva esse arquivo, e os templates WinSW injetam essas variaveis no `Backend`, `Ingest` e `Multicast Agent`.
+- O bundle do instalador agora precisa incluir `vendor\winsw\WinSW-x64.exe` e `ffmpeg\ffmpeg.exe` como artefatos obrigatorios. Os scripts PowerShell e o multicast-agent ja procuram exatamente esse layout dentro de `{app}`.
+- A primeira rodada de wrappers automatizados cobre `KhompStack-Backend`, `KhompStack-Ingest` e `KhompStack-MulticastAgent`. `Asterisk`, `MQTT` e `Postgres` seguem como parte do layout alvo da suite, mas o instalador atual ainda nao os provisiona como servicos.
+- A primeira versao do instalador ainda nao provisiona regras de firewall automaticamente. Esse passo continua no design-alvo, mas permaneceu fora do escopo executado nesta rodada.
 
 ## Packaging Recommendation
 
@@ -268,7 +296,7 @@ O produto deve ser distribuido por um unico instalador `.exe` para Windows. O in
 2. cria estrutura em `Program Files` e `ProgramData`;
 3. registra servicos;
 4. gera configuracao inicial;
-5. cria regras de firewall necessarias;
+5. provisiona regras de firewall necessarias em uma rodada posterior do instalador;
 6. inicia a stack;
 7. abre o app desktop.
 
