@@ -7,7 +7,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
-import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { AppError } from "../../../core/errors/app-error";
 import { allocateMulticastAddress } from "../../users/_shared/pbx";
@@ -24,6 +24,10 @@ import type {
   StopGroupMulticastInput,
   UpdateGroupMulticastConfigInput,
 } from "./schema";
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(currentDir, "../../../../../../");
+const MULTICAST_SHARED_AUDIO_ROOT = path.join(repoRoot, ".runtime", "multicast-agent-inputs");
 
 async function getGroupOrThrow(groupId: string, requesterId: string) {
   const group = await db.query.deviceGroup.findFirst({
@@ -85,12 +89,21 @@ async function sendMulticastMqttToDevices(
   );
 }
 
-async function writeAudioTempFile(base64Data: string, fileName: string): Promise<string> {
-  const tempId = randomUUID();
+async function stageSharedMulticastAudio(
+  groupId: string,
+  base64Data: string,
+  fileName: string,
+): Promise<string> {
   const ext = path.extname(fileName) || ".wav";
-  const tempInputPath = path.join(tmpdir(), `multicast-in-${tempId}${ext}`);
-  await fs.writeFile(tempInputPath, Buffer.from(base64Data, "base64"));
-  return tempInputPath;
+  const stagedDir = path.join(MULTICAST_SHARED_AUDIO_ROOT, groupId, randomUUID());
+  const stagedPath = path.join(stagedDir, `input${ext}`);
+
+  // The multicast agent runs alongside the server, so staged audio lives under a
+  // repo-local shared directory instead of an implicit per-process temp path.
+  await fs.rm(stagedDir, { recursive: true, force: true });
+  await fs.mkdir(stagedDir, { recursive: true });
+  await fs.writeFile(stagedPath, Buffer.from(base64Data, "base64"));
+  return stagedPath;
 }
 
 export async function updateGroupMulticastConfig(input: UpdateGroupMulticastConfigInput) {
@@ -133,7 +146,7 @@ export async function startGroupMulticast(input: StartGroupMulticastInput) {
     if (!config.sourceUrl) {
       throw new AppError("INVALID_REQUEST", { message: "Radio URL is required" });
     }
-    startMulticastStream(input.groupId, group.multicastAddress, {
+    await startMulticastStream(input.groupId, group.multicastAddress, {
       type: "radio_url",
       url: config.sourceUrl,
     });
@@ -141,8 +154,12 @@ export async function startGroupMulticast(input: StartGroupMulticastInput) {
     if (!config.audioFileData || !config.audioFileName) {
       throw new AppError("INVALID_REQUEST", { message: "Audio file is required" });
     }
-    const tempFilePath = await writeAudioTempFile(config.audioFileData, config.audioFileName);
-    startMulticastStream(input.groupId, group.multicastAddress, {
+    const tempFilePath = await stageSharedMulticastAudio(
+      input.groupId,
+      config.audioFileData,
+      config.audioFileName,
+    );
+    await startMulticastStream(input.groupId, group.multicastAddress, {
       type: "audio_file",
       filePath: tempFilePath,
     });
@@ -159,7 +176,7 @@ export async function startGroupMulticast(input: StartGroupMulticastInput) {
 export async function stopGroupMulticast(input: StopGroupMulticastInput) {
   const group = await ensureMulticastAddress(input.groupId, input.requesterId);
 
-  stopMulticastStream(input.groupId);
+  await stopMulticastStream(input.groupId);
 
   await sendMulticastMqttToDevices(input.groupId, input.requesterId, group.multicastAddress, []);
 }

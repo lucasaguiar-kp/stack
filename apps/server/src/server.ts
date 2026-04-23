@@ -289,7 +289,15 @@ app.use("/*", async (c, next) => {
 });
 
 app.get("/", (c) => {
-  return c.text("OK");
+  return c.json({
+    ok: true,
+    service: "stack-pbx-server",
+    multicastAgent: {
+      host: env.MULTICAST_AGENT_HOST,
+      port: env.MULTICAST_AGENT_PORT,
+      url: `http://${env.MULTICAST_AGENT_HOST}:${env.MULTICAST_AGENT_PORT}`,
+    },
+  });
 });
 
 const websocket = {

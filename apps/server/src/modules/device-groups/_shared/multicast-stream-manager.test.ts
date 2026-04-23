@@ -1,84 +1,111 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import {
-  buildMulawConversionArgs,
-  buildNodeSenderArgs,
+  MULTICAST_RTP_PORT,
+  activeStreams,
+  getMulticastStreamStatus,
+  startMulticastStream,
+  stopMulticastStream,
 } from "./multicast-stream-manager";
+import { multicastEvents } from "./multicast-events";
 
-describe("multicast stream pipeline", () => {
-  test("builds ffmpeg args that convert files to raw mulaw on stdout", () => {
-    expect(
-      buildMulawConversionArgs({ type: "audio_file", filePath: "/tmp/input.wav" }),
-    ).toEqual([
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      "-re",
-      "-i",
-      "/tmp/input.wav",
-      "-vn",
-      "-acodec",
-      "pcm_mulaw",
-      "-ar",
-      "8000",
-      "-ac",
-      "1",
-      "-f",
-      "mulaw",
-      "-",
-    ]);
+const originalFetch = globalThis.fetch;
+
+function createFetchMock() {
+  return mock(async () => new Response(JSON.stringify({ ok: true })));
+}
+
+describe("backend multicast agent delegation", () => {
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    activeStreams.clear();
+    multicastEvents.removeAllListeners("status");
   });
 
-  test("builds ffmpeg args that convert radio streams to raw mulaw on stdout", () => {
-    expect(
-      buildMulawConversionArgs({
-        type: "radio_url",
-        url: "https://example.com/stream",
+  test("posts start requests to the multicast agent", async () => {
+    const fetchMock = createFetchMock();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await startMulticastStream("group-1", "224.0.0.1", {
+      type: "radio_url",
+      url: "https://example.com/live",
+    });
+
+    const [requestUrl, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(requestUrl).toBe("http://127.0.0.1:3010/multicast/start");
+    expect(requestInit).toMatchObject({
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        groupId: "group-1",
+        sourceType: "radio_url",
+        source: "https://example.com/live",
+        multicastAddress: "224.0.0.1",
+        port: MULTICAST_RTP_PORT,
       }),
-    ).toEqual([
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      "-i",
-      "https://example.com/stream",
-      "-vn",
-      "-acodec",
-      "pcm_mulaw",
-      "-ar",
-      "8000",
-      "-ac",
-      "1",
-      "-f",
-      "mulaw",
-      "-",
-    ]);
+    });
   });
 
-  test("builds node sender args for stdin mode", () => {
-    expect(
-      buildNodeSenderArgs({
-        address: "224.0.0.1",
-        port: 16384,
-        sourcePath: null,
+  test("posts stop requests to the multicast agent", async () => {
+    const fetchMock = createFetchMock();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await stopMulticastStream("group-1");
+
+    const [requestUrl, requestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(requestUrl).toBe("http://127.0.0.1:3010/multicast/stop");
+    expect(requestInit).toMatchObject({
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        groupId: "group-1",
       }),
-    ).toEqual([
-      "/Users/lucasaguiar/www/kp/stack-pbx/apps/server/src/modules/device-groups/_shared/rtp_sender.cjs",
-      "224.0.0.1",
-      "16384",
-    ]);
+    });
   });
 
-  test("builds node sender args for file mode", () => {
-    expect(
-      buildNodeSenderArgs({
-        address: "224.0.0.1",
-        port: 16384,
-        sourcePath: "/tmp/output.raw",
-      }),
-    ).toEqual([
-      "/Users/lucasaguiar/www/kp/stack-pbx/apps/server/src/modules/device-groups/_shared/rtp_sender.cjs",
-      "/tmp/output.raw",
-      "224.0.0.1",
-      "16384",
-    ]);
+  test("tracks active status locally after start and stop", async () => {
+    const fetchMock = createFetchMock();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await startMulticastStream("group-1", "224.0.0.1", {
+      type: "audio_file",
+      filePath: "/tmp/live.wav",
+    });
+
+    expect(getMulticastStreamStatus("group-1")).toMatchObject({
+      running: true,
+      address: "224.0.0.1",
+    });
+
+    await stopMulticastStream("group-1");
+
+    expect(getMulticastStreamStatus("group-1")).toEqual({ running: false });
+  });
+
+  test("emits a stop event even if local cache was already empty", async () => {
+    const fetchMock = createFetchMock();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const events: Array<{ groupId: string; running: boolean }> = [];
+
+    multicastEvents.on("status", (event) => {
+      events.push({ groupId: event.groupId, running: event.running });
+    });
+
+    await startMulticastStream("group-1", "224.0.0.1", {
+      type: "radio_url",
+      url: "https://example.com/live",
+    });
+
+    activeStreams.clear();
+    await stopMulticastStream("group-1");
+
+    expect(events).toContainEqual({ groupId: "group-1", running: false });
   });
 });

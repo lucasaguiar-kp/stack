@@ -1,8 +1,11 @@
+import { mkdir, rm } from "node:fs/promises";
+import path from "node:path";
 import { EventEmitter } from "node:events";
 import { describe, expect, mock, test } from "bun:test";
 import { createRoutes } from "../routes";
 import {
   MulticastSessionManager,
+  MULTICAST_SHARED_AUDIO_ROOT,
   buildFfmpegArgs,
   buildSenderArgs,
 } from "./multicast-session-manager";
@@ -180,11 +183,116 @@ describe("multicast session manager", () => {
     expect(manager.stop("group-err")).toBe(false);
   });
 
+  test("reports running status for active sessions", async () => {
+    const ffmpegProcess = new EventEmitter() as EventEmitter & {
+      stdout: { pipe: ReturnType<typeof mock> };
+      stdin: { end: ReturnType<typeof mock> };
+      stderr: { on: ReturnType<typeof mock> };
+      kill: ReturnType<typeof mock>;
+    };
+    ffmpegProcess.stdout = { pipe: mock((destination: unknown) => destination) };
+    ffmpegProcess.stdin = { end: mock(() => undefined) };
+    ffmpegProcess.stderr = { on: mock(() => undefined) };
+    ffmpegProcess.kill = mock(() => true);
+
+    const senderProcess = new EventEmitter() as EventEmitter & {
+      stdin: { end: ReturnType<typeof mock> };
+      stderr: { on: ReturnType<typeof mock> };
+      kill: ReturnType<typeof mock>;
+    };
+    senderProcess.stdin = { end: mock(() => undefined) };
+    senderProcess.stderr = { on: mock(() => undefined) };
+    senderProcess.kill = mock(() => true);
+
+    const spawnProcess = mock((command: string) => {
+      if (command === "ffmpeg-path") {
+        return ffmpegProcess as never;
+      }
+
+      return senderProcess as never;
+    });
+
+    const manager = new MulticastSessionManager({ spawnProcess });
+    const startPromise = manager.start({
+      groupId: "group-status",
+      sourceType: "radio_url",
+      source: "https://example.com/live",
+      multicastAddress: "224.0.0.1",
+      port: 16384,
+      ffmpegPath: "ffmpeg-path",
+    });
+
+    senderProcess.emit("spawn");
+    ffmpegProcess.emit("spawn");
+    await startPromise;
+
+    expect(manager.getStatus("group-status")).toEqual({ running: true });
+
+    manager.stop("group-status");
+
+    expect(manager.getStatus("group-status")).toEqual({ running: false });
+  });
+
+  test("removes staged shared audio files when an audio session stops", async () => {
+    const sharedGroupDir = path.join(MULTICAST_SHARED_AUDIO_ROOT, "group-cleanup");
+    const stagedAudioPath = path.join(sharedGroupDir, "input.wav");
+    await rm(sharedGroupDir, { recursive: true, force: true });
+    await mkdir(sharedGroupDir, { recursive: true });
+    await Bun.write(stagedAudioPath, "wave-data");
+
+    const ffmpegProcess = new EventEmitter() as EventEmitter & {
+      stdout: { pipe: ReturnType<typeof mock> };
+      stdin: { end: ReturnType<typeof mock> };
+      stderr: { on: ReturnType<typeof mock> };
+      kill: ReturnType<typeof mock>;
+    };
+    ffmpegProcess.stdout = { pipe: mock((destination: unknown) => destination) };
+    ffmpegProcess.stdin = { end: mock(() => undefined) };
+    ffmpegProcess.stderr = { on: mock(() => undefined) };
+    ffmpegProcess.kill = mock(() => true);
+
+    const senderProcess = new EventEmitter() as EventEmitter & {
+      stdin: { end: ReturnType<typeof mock> };
+      stderr: { on: ReturnType<typeof mock> };
+      kill: ReturnType<typeof mock>;
+    };
+    senderProcess.stdin = { end: mock(() => undefined) };
+    senderProcess.stderr = { on: mock(() => undefined) };
+    senderProcess.kill = mock(() => true);
+
+    const spawnProcess = mock((command: string) => {
+      if (command === "ffmpeg-path") {
+        return ffmpegProcess as never;
+      }
+
+      return senderProcess as never;
+    });
+
+    const manager = new MulticastSessionManager({ spawnProcess });
+    const startPromise = manager.start({
+      groupId: "group-cleanup",
+      sourceType: "audio_file",
+      source: stagedAudioPath,
+      multicastAddress: "224.0.0.1",
+      port: 16384,
+      ffmpegPath: "ffmpeg-path",
+    });
+
+    senderProcess.emit("spawn");
+    ffmpegProcess.emit("spawn");
+    await startPromise;
+
+    manager.stop("group-cleanup");
+
+    expect(await Bun.file(stagedAudioPath).exists()).toBe(false);
+  });
+
   test("returns a failure response when multicast startup fails", async () => {
     const app = createRoutes({
       sessionManager: {
         start: mock(async () => ({ ok: false as const, error: "spawn failed" })),
         stop: mock(() => false),
+        getStatus: mock(() => ({ running: false })),
       },
     });
 
@@ -206,6 +314,25 @@ describe("multicast session manager", () => {
     await expect(response.json()).resolves.toEqual({
       ok: false,
       error: "spawn failed",
+    });
+  });
+
+  test("returns running status from the session manager", async () => {
+    const app = createRoutes({
+      sessionManager: {
+        start: mock(async () => ({ ok: true as const })),
+        stop: mock(() => false),
+        getStatus: mock((groupId: string) => ({ running: groupId === "group-1" })),
+      },
+    });
+
+    const response = await app.request("/multicast/group-1/status");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      groupId: "group-1",
+      running: true,
     });
   });
 });

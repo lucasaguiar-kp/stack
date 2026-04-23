@@ -10,6 +10,7 @@ type RouteDependencies = {
   sessionManager?: {
     start: typeof multicastSessionManager.start;
     stop: typeof multicastSessionManager.stop;
+    getStatus: typeof multicastSessionManager.getStatus;
   };
   resolveFfmpegPath?: typeof resolveBundledFfmpegPath;
 };
@@ -20,6 +21,13 @@ export function createRoutes(dependencies: RouteDependencies = {}) {
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ ok: true }));
+  app.get("/multicast/:groupId/status", (c) => {
+    const groupId = c.req.param("groupId");
+    const status = sessionManager.getStatus(groupId);
+
+    return c.json({ ok: true, groupId, ...status });
+  });
+
   app.post("/multicast/start", async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsed = multicastStartSchema.safeParse(body);

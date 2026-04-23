@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +20,8 @@ type ManagedProcess = Pick<
 type Session = {
   ffmpegProcess: ManagedProcess;
   senderProcess: ManagedProcess;
+  source: string;
+  sourceType: MulticastSourceType;
 };
 
 type StartSessionInput = BuildFfmpegArgsInput & {
@@ -36,6 +39,8 @@ type MulticastSessionManagerOptions = {
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const senderScriptPath = path.join(currentDir, "rtp-sender.cjs");
+const repoRoot = path.resolve(currentDir, "../../../../");
+export const MULTICAST_SHARED_AUDIO_ROOT = path.join(repoRoot, ".runtime", "multicast-agent-inputs");
 
 export function buildFfmpegArgs({ sourceType, source }: BuildFfmpegArgsInput) {
   const inputArgs =
@@ -108,7 +113,12 @@ export class MulticastSessionManager {
       };
     }
 
-    const session: Session = { ffmpegProcess, senderProcess };
+    const session: Session = {
+      ffmpegProcess,
+      senderProcess,
+      source: input.source,
+      sourceType: input.sourceType,
+    };
     this.sessions.set(input.groupId, session);
 
     ffmpegProcess.stdout?.pipe(senderProcess.stdin as NodeJS.WritableStream);
@@ -137,7 +147,12 @@ export class MulticastSessionManager {
     this.sessions.delete(groupId);
     session.ffmpegProcess.kill("SIGTERM");
     session.senderProcess.kill("SIGTERM");
+    this.cleanupSessionArtifacts(session);
     return true;
+  }
+
+  getStatus(groupId: string) {
+    return { running: this.sessions.has(groupId) };
   }
 
   private cleanup(groupId: string, session: Session) {
@@ -146,6 +161,7 @@ export class MulticastSessionManager {
     }
 
     this.sessions.delete(groupId);
+    this.cleanupSessionArtifacts(session);
   }
 
   private cleanupFailedStart(
@@ -154,6 +170,25 @@ export class MulticastSessionManager {
   ) {
     senderProcess?.kill("SIGTERM");
     ffmpegProcess?.kill("SIGTERM");
+  }
+
+  private cleanupSessionArtifacts(session: Session) {
+    if (session.sourceType !== "audio_file") {
+      return;
+    }
+
+    const resolvedSource = path.resolve(session.source);
+    const resolvedSharedRoot = `${path.resolve(MULTICAST_SHARED_AUDIO_ROOT)}${path.sep}`;
+
+    if (!resolvedSource.startsWith(resolvedSharedRoot)) {
+      return;
+    }
+
+    try {
+      rmSync(path.dirname(resolvedSource), { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup: staged audio should never block session teardown.
+    }
   }
 
   private waitForSpawn(processHandle: ManagedProcess | undefined): Promise<StartSessionResult> {
