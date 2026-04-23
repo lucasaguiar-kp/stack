@@ -1,0 +1,21 @@
+<service>
+  <id>KhompStack-Backend</id>
+  <name>Khomp Stack Backend</name>
+  <description>Khomp Stack local backend service</description>
+  <executable>__INSTALL_ROOT__\backend\server.exe</executable>
+  <workingdirectory>__INSTALL_ROOT__</workingdirectory>
+  __ENV_ENTRIES__
+  <logpath>__PROGRAM_DATA_ROOT__\logs\backend</logpath>
+  <log mode="roll-by-size-time">
+    <sizeThreshold>10240</sizeThreshold>
+    <pattern>yyyyMMdd</pattern>
+    <autoRollAtTime>00:00:00</autoRollAtTime>
+    <zipOlderThanNumDays>7</zipOlderThanNumDays>
+  </log>
+  <stoptimeout>15sec</stoptimeout>
+  <stopparentprocessfirst>true</stopparentprocessfirst>
+  <startmode>Automatic</startmode>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="none" />
+</service>
