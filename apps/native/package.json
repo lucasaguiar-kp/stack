@@ -1,0 +1,19 @@
+{
+  "name": "native",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "bun run build && electron ./dist/main.js",
+    "build": "bun run --cwd ../web build:desktop && bun build ./src/main.ts ./src/preload.ts --outdir ./dist --target=node --external electron && bun -e \"import { cpSync, mkdirSync, rmSync } from 'node:fs'; import path from 'node:path'; const root = process.cwd(); const source = path.join(root, '../web/dist'); const target = path.join(root, 'dist/renderer'); rmSync(target, { recursive: true, force: true }); mkdirSync(path.dirname(target), { recursive: true }); cpSync(source, target, { recursive: true });\"",
+    "start": "electron ./dist/main.js",
+    "check-types": "tsc -b",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@stack-pbx/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "electron": "^37.2.6",
+    "typescript": "catalog:"
+  }
+}

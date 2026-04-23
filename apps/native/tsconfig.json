@@ -1,0 +1,9 @@
+{
+  "extends": "@stack-pbx/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "lib": ["ESNext", "DOM"]
+  },
+  "include": ["src/**/*.ts"]
+}
