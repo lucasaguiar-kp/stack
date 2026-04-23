@@ -1,15 +1,211 @@
-import { describe, expect, test } from "bun:test";
-import { resolveBundledFfmpegPath } from "./ffmpeg-path";
-import { resolveWindowsProgramDataPath } from "./windows-paths";
+import { EventEmitter } from "node:events";
+import { describe, expect, mock, test } from "bun:test";
+import { createRoutes } from "../routes";
+import {
+  MulticastSessionManager,
+  buildFfmpegArgs,
+  buildSenderArgs,
+} from "./multicast-session-manager";
 
-describe("multicast agent windows paths", () => {
-  test("resolves bundled ffmpeg path under Program Files", () => {
-    const result = resolveBundledFfmpegPath("C:\\Program Files\\Khomp Stack");
-    expect(result).toBe("C:\\Program Files\\Khomp Stack\\ffmpeg\\ffmpeg.exe");
+describe("multicast session manager", () => {
+  test("builds ffmpeg args for radio streams", () => {
+    expect(
+      buildFfmpegArgs({
+        sourceType: "radio_url",
+        source: "https://example.com/live",
+      }),
+    ).toEqual([
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-re",
+      "-i",
+      "https://example.com/live",
+      "-ar",
+      "8000",
+      "-ac",
+      "1",
+      "-f",
+      "mulaw",
+      "-",
+    ]);
   });
 
-  test("resolves ProgramData root for logs and config", () => {
-    const result = resolveWindowsProgramDataPath("C:\\ProgramData");
-    expect(result).toBe("C:\\ProgramData\\Khomp Stack");
+  test("builds ffmpeg args for file sources with pacing", () => {
+    expect(
+      buildFfmpegArgs({
+        sourceType: "audio_file",
+        source: "/tmp/audio.wav",
+      }),
+    ).toEqual([
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-re",
+      "-i",
+      "/tmp/audio.wav",
+      "-ar",
+      "8000",
+      "-ac",
+      "1",
+      "-f",
+      "mulaw",
+      "-",
+    ]);
+  });
+
+  test("builds sender args for stdin mode", () => {
+    expect(buildSenderArgs("224.0.0.1", 16384)).toEqual([
+      "/Users/lucasaguiar/www/kp/stack-pbx/apps/multicast-agent/src/service/rtp-sender.cjs",
+      "224.0.0.1",
+      "16384",
+    ]);
+  });
+
+  test("starts and stops a multicast session", async () => {
+    const ffmpegProcess = new EventEmitter() as EventEmitter & {
+      stdout: { pipe: ReturnType<typeof mock> };
+      stdin: { end: ReturnType<typeof mock> };
+      stderr: { on: ReturnType<typeof mock> };
+      kill: ReturnType<typeof mock>;
+    };
+    ffmpegProcess.stdout = {
+      pipe: mock((destination: unknown) => destination),
+    };
+    ffmpegProcess.stdin = {
+      end: mock(() => undefined),
+    };
+    ffmpegProcess.stderr = {
+      on: mock(() => undefined),
+    };
+    ffmpegProcess.kill = mock(() => true);
+
+    const senderProcess = new EventEmitter() as EventEmitter & {
+      stdin: { end: ReturnType<typeof mock> };
+      stderr: { on: ReturnType<typeof mock> };
+      kill: ReturnType<typeof mock>;
+    };
+    senderProcess.stdin = {
+      end: mock(() => undefined),
+    };
+    senderProcess.stderr = {
+      on: mock(() => undefined),
+    };
+    senderProcess.kill = mock(() => true);
+
+    const spawnProcess = mock((command: string) => {
+      if (command === "ffmpeg-path") {
+        return ffmpegProcess as never;
+      }
+
+      return senderProcess as never;
+    });
+
+    const manager = new MulticastSessionManager({
+      spawnProcess,
+    });
+
+    const startPromise = manager.start({
+      groupId: "group-1",
+      sourceType: "radio_url",
+      source: "https://example.com/live",
+      multicastAddress: "224.0.0.1",
+      port: 16384,
+      ffmpegPath: "ffmpeg-path",
+    });
+
+    senderProcess.emit("spawn");
+    ffmpegProcess.emit("spawn");
+
+    await expect(startPromise).resolves.toEqual({ ok: true });
+    expect(spawnProcess).toHaveBeenCalledTimes(2);
+    expect(ffmpegProcess.stdout.pipe).toHaveBeenCalledWith(senderProcess.stdin);
+    expect(manager.stop("group-1")).toBe(true);
+    expect(ffmpegProcess.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(senderProcess.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(manager.stop("group-1")).toBe(false);
+  });
+
+  test("reports spawn failures instead of starting a session", async () => {
+    const makeProcess = () => {
+      const process = new EventEmitter() as EventEmitter & {
+        stdout: { pipe: ReturnType<typeof mock> };
+        stdin: { end: ReturnType<typeof mock> };
+        stderr: { on: ReturnType<typeof mock> };
+        kill: ReturnType<typeof mock>;
+      };
+
+      process.stdout = {
+        pipe: mock(() => undefined),
+      };
+      process.stdin = {
+        end: mock(() => undefined),
+      };
+      process.stderr = {
+        on: mock(() => undefined),
+      };
+      process.kill = mock(() => true);
+
+      return process;
+    };
+
+    const senderProcess = makeProcess();
+    const ffmpegProcess = makeProcess();
+
+    const spawnProcess = mock((command: string) => {
+      if (command === "node") {
+        return senderProcess as never;
+      }
+
+      return ffmpegProcess as never;
+    });
+
+    const manager = new MulticastSessionManager({ spawnProcess });
+    const startPromise = manager.start({
+      groupId: "group-err",
+      sourceType: "audio_file",
+      source: "/tmp/audio.wav",
+      multicastAddress: "224.0.0.1",
+      port: 16384,
+      ffmpegPath: "missing-ffmpeg",
+    });
+
+    senderProcess.emit("spawn");
+    ffmpegProcess.emit("error", new Error("spawn failed"));
+
+    await expect(startPromise).resolves.toEqual({
+      ok: false,
+      error: "spawn failed",
+    });
+    expect(manager.stop("group-err")).toBe(false);
+  });
+
+  test("returns a failure response when multicast startup fails", async () => {
+    const app = createRoutes({
+      sessionManager: {
+        start: mock(async () => ({ ok: false as const, error: "spawn failed" })),
+        stop: mock(() => false),
+      },
+    });
+
+    const response = await app.request("/multicast/start", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        groupId: "group-1",
+        sourceType: "audio_file",
+        source: "/tmp/audio.wav",
+        multicastAddress: "224.0.0.1",
+        port: 16384,
+      }),
+    });
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "spawn failed",
+    });
   });
 });
