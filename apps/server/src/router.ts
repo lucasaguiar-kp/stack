@@ -17,6 +17,7 @@ import { syncDeviceRoute } from "./modules/devices/sync-device/route";
 import { syncNetworkDevicesRoute } from "./modules/devices/sync-network/route";
 import { updateDeviceRoute } from "./modules/devices/update-device/route";
 import { updateDeviceConfigRoute } from "./modules/devices/update-device-config/route";
+import { getUpdateStatusRoute } from "./modules/system/get-update-status/route";
 import { getUserConnectionInfoRoute } from "./modules/users/get-connection-info/route";
 import { getUserPbxCredentialsRoute } from "./modules/users/get-pbx-credentials/route";
 import { getSetupStatusRoute } from "./modules/users/get-setup-status/route";
@@ -29,6 +30,9 @@ export const appRouter = {
   }),
   setup: {
     status: getSetupStatusRoute,
+  },
+  system: {
+    updateStatus: getUpdateStatusRoute,
   },
   user: {
     pbxCredentials: getUserPbxCredentialsRoute,
