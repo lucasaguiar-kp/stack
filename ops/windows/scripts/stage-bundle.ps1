@@ -56,6 +56,24 @@ function Copy-DirectoryContents {
   }
 }
 
+function Assert-DesktopRendererApiUrl {
+  param([string]$RendererRoot)
+
+  Assert-Path -Path $RendererRoot -Description "desktop renderer root"
+
+  $rendererFiles = Get-ChildItem -LiteralPath $RendererRoot -Recurse -File -Include "*.html", "*.js", "*.css"
+  $forbiddenApiUrl = $rendererFiles | Select-String -Pattern ":3002", "localhost:3002", "127.0.0.1:3002" -SimpleMatch
+  if ($null -ne $forbiddenApiUrl) {
+    $firstMatch = $forbiddenApiUrl | Select-Object -First 1
+    throw "Desktop renderer was built with a development API URL ($($firstMatch.Pattern)) in $($firstMatch.Path). Rebuild with the packaged API URL."
+  }
+
+  $packagedApiUrl = $rendererFiles | Select-String -Pattern "http://127.0.0.1:3000" -SimpleMatch
+  if ($null -eq $packagedApiUrl) {
+    throw "Desktop renderer does not contain the packaged API URL http://127.0.0.1:3000."
+  }
+}
+
 function Download-File {
   param(
     [string]$Url,
@@ -145,6 +163,7 @@ Move-Item -LiteralPath (Join-Path $desktopTarget "electron.exe") -Destination (J
 $desktopAppTarget = Join-Path $desktopTarget "resources\app"
 New-CleanDirectory -Path $desktopAppTarget
 Copy-DirectoryContents -Source $nativeDist -Destination $desktopAppTarget
+Assert-DesktopRendererApiUrl -RendererRoot (Join-Path $desktopAppTarget "renderer")
 
 Write-Step "Staging compiled service executables"
 $serviceTargets = @{

@@ -9,9 +9,9 @@ export default defineConfig(({ command, mode }) => {
   const rootEnv = loadEnv(mode, envDir, "");
   const isBuild = command === "build";
   const pbxHost = process.env.PBX_HOST ?? rootEnv.PBX_HOST ?? "127.0.0.1";
+  const desktopServerUrl = "http://127.0.0.1:3000";
   const serverUrl =
-    process.env.VITE_SERVER_URL ??
-    (isBuild ? "http://127.0.0.1:3000" : rootEnv.VITE_SERVER_URL ?? "http://127.0.0.1:3000");
+    isBuild ? desktopServerUrl : process.env.VITE_SERVER_URL ?? rootEnv.VITE_SERVER_URL ?? desktopServerUrl;
   const sipWsUrl =
     process.env.VITE_ASTERISK_WS_URL ??
     (isBuild

@@ -47,6 +47,15 @@ type RendererServer = {
   url: string;
 };
 
+type DesktopRuntimeConfig = {
+  VITE_ASTERISK_SIP_DOMAIN: string;
+  VITE_ASTERISK_WS_URL: string;
+  VITE_MQTT_PUBLIC_URL: string;
+  VITE_PBX_HOST: string;
+  VITE_SERVER_URL: string;
+  VITE_WEBRTC_STUN_URLS?: string;
+};
+
 declare const require: (moduleName: string) => ElectronMainModule;
 
 const loadElectron = () => require("electron");
@@ -112,6 +121,75 @@ function getContentType(filePath: string) {
   }
 }
 
+function parseEnvFile(contents: string) {
+  const values: Record<string, string> = {};
+
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim().replace(/^"(.*)"$/, "$1");
+    values[key] = value;
+  }
+
+  return values;
+}
+
+async function readServiceRuntimeEnv() {
+  const programDataRoot = path.join(process.env.ProgramData || "C:\\ProgramData", "Khomp Stack");
+  const runtimeEnvPath = path.join(programDataRoot, "config", "service-runtime.env");
+
+  try {
+    return parseEnvFile(await readFile(runtimeEnvPath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+async function resolveDesktopRuntimeConfig(): Promise<DesktopRuntimeConfig> {
+  const runtimeEnv = await readServiceRuntimeEnv();
+  const backendPort = runtimeEnv.PORT || "3000";
+  const pbxHost = runtimeEnv.PBX_HOST || "127.0.0.1";
+  const freeSwitchWsPort = runtimeEnv.FREESWITCH_WS_PORT || "5066";
+  const mqttBrokerPort = runtimeEnv.MQTT_BROKER_PORT || "1883";
+  const sipDomain =
+    runtimeEnv.FREESWITCH_DOMAIN ||
+    runtimeEnv.ASTERISK_DEVICE_HOST ||
+    runtimeEnv.PBX_HOST ||
+    pbxHost;
+
+  return {
+    VITE_ASTERISK_SIP_DOMAIN: sipDomain,
+    VITE_ASTERISK_WS_URL: runtimeEnv.VITE_ASTERISK_WS_URL || `ws://${pbxHost}:${freeSwitchWsPort}`,
+    VITE_MQTT_PUBLIC_URL:
+      runtimeEnv.MQTT_PUBLIC_URL || runtimeEnv.VITE_MQTT_PUBLIC_URL || `mqtt://${pbxHost}:${mqttBrokerPort}`,
+    VITE_PBX_HOST: pbxHost,
+    VITE_SERVER_URL: `http://127.0.0.1:${backendPort}`,
+    ...(runtimeEnv.VITE_WEBRTC_STUN_URLS
+      ? { VITE_WEBRTC_STUN_URLS: runtimeEnv.VITE_WEBRTC_STUN_URLS }
+      : {}),
+  };
+}
+
+function injectRuntimeConfig(html: string, config: DesktopRuntimeConfig) {
+  const json = JSON.stringify(config).replaceAll("<", "\\u003c");
+  const script = `<script>window.__KHOMP_STACK_RUNTIME_CONFIG__=${json};</script>`;
+
+  if (html.includes("</head>")) {
+    return html.replace("</head>", `    ${script}\n  </head>`);
+  }
+
+  return `${script}\n${html}`;
+}
+
 function resolveRendererRequestPath(urlPath: string) {
   const normalizedPath = decodeURIComponent(urlPath.split("?")[0] || "/");
   const requestedPath =
@@ -127,8 +205,19 @@ function resolveRendererRequestPath(urlPath: string) {
 }
 
 async function respondWithRendererAsset(request: IncomingMessage, response: ServerResponse) {
+  const urlPath = request.url || "/";
+  if (urlPath.split("?")[0] === "/khomp-stack-runtime-config.json") {
+    const config = await resolveDesktopRuntimeConfig();
+    response.writeHead(200, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-cache",
+    });
+    response.end(JSON.stringify(config));
+    return;
+  }
+
   const bundledIndexPath = resolveBundledWebIndexPath();
-  const resolvedPath = resolveRendererRequestPath(request.url || "/");
+  const resolvedPath = resolveRendererRequestPath(urlPath);
 
   if (!resolvedPath) {
     response.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
@@ -141,6 +230,17 @@ async function respondWithRendererAsset(request: IncomingMessage, response: Serv
   const targetPath = shouldServeIndex ? bundledIndexPath : resolvedPath;
 
   try {
+    if (targetPath === bundledIndexPath) {
+      const contents = await readFile(targetPath, "utf8");
+      const runtimeConfig = await resolveDesktopRuntimeConfig();
+      response.writeHead(200, {
+        "content-type": getContentType(targetPath),
+        "cache-control": "no-cache",
+      });
+      response.end(injectRuntimeConfig(contents, runtimeConfig));
+      return;
+    }
+
     const contents = await readFile(targetPath);
     response.writeHead(200, {
       "content-type": getContentType(targetPath),
@@ -149,12 +249,13 @@ async function respondWithRendererAsset(request: IncomingMessage, response: Serv
     response.end(contents);
   } catch {
     if (targetPath !== bundledIndexPath) {
-      const contents = await readFile(bundledIndexPath);
+      const contents = await readFile(bundledIndexPath, "utf8");
+      const runtimeConfig = await resolveDesktopRuntimeConfig();
       response.writeHead(200, {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "no-cache",
       });
-      response.end(contents);
+      response.end(injectRuntimeConfig(contents, runtimeConfig));
       return;
     }
 

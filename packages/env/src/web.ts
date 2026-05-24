@@ -1,6 +1,30 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
+type WebRuntimeConfig = Partial<{
+  VITE_ASTERISK_SIP_DOMAIN: string;
+  VITE_ASTERISK_WS_URL: string;
+  VITE_MQTT_PUBLIC_URL: string;
+  VITE_PBX_HOST: string;
+  VITE_SERVER_URL: string;
+  VITE_WEBRTC_STUN_URLS: string;
+}>;
+
+const runtimeConfig =
+  typeof globalThis === "undefined"
+    ? undefined
+    : (
+        globalThis as typeof globalThis & {
+          __KHOMP_STACK_RUNTIME_CONFIG__?: WebRuntimeConfig;
+          window?: { __KHOMP_STACK_RUNTIME_CONFIG__?: WebRuntimeConfig };
+        }
+      ).window?.__KHOMP_STACK_RUNTIME_CONFIG__ ??
+      (
+        globalThis as typeof globalThis & {
+          __KHOMP_STACK_RUNTIME_CONFIG__?: WebRuntimeConfig;
+        }
+      ).__KHOMP_STACK_RUNTIME_CONFIG__;
+
 const rawEnv = createEnv({
   clientPrefix: "VITE_",
   client: {
@@ -11,7 +35,10 @@ const rawEnv = createEnv({
     VITE_MQTT_PUBLIC_URL: z.string().min(1).optional(),
     VITE_WEBRTC_STUN_URLS: z.string().min(1).optional(),
   },
-  runtimeEnv: (import.meta as any).env,
+  runtimeEnv: {
+    ...(import.meta as any).env,
+    ...runtimeConfig,
+  },
   emptyStringAsUndefined: true,
 });
 
