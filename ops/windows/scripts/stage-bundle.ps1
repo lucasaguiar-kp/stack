@@ -1,6 +1,7 @@
 param(
   [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path,
   [string]$BundleRoot = "",
+  [string]$RuntimeRoot = "",
   [string]$FreeSwitchVersion = "1.10.12",
   [string]$FreeSwitchMsiUrl = "http://files.freeswitch.org/windows/installer/x64/FreeSWITCH-1.10.12-Release-x64.msi",
   [string]$FfmpegZipUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
@@ -69,19 +70,68 @@ function Download-File {
   Invoke-WebRequest -Uri $Url -OutFile $Destination
 }
 
+function Get-ElectronVersion {
+  param([string]$RepoRootPath)
+
+  $nativePackageJsonPath = Join-Path $RepoRootPath "apps\native\package.json"
+  Assert-Path -Path $nativePackageJsonPath -Description "native package.json"
+
+  $nativePackageJson = Get-Content -LiteralPath $nativePackageJsonPath -Raw | ConvertFrom-Json
+  $declaredVersion = [string]$nativePackageJson.devDependencies.electron
+
+  if ([string]::IsNullOrWhiteSpace($declaredVersion)) {
+    throw "Electron dependency was not found in apps\native\package.json."
+  }
+
+  return ($declaredVersion.Trim() -replace '^[\^~=v]+', '')
+}
+
+function Ensure-ElectronRuntime {
+  param(
+    [string]$RepoRootPath,
+    [string]$RuntimeRootPath
+  )
+
+  $electronDistPath = Join-Path $RepoRootPath "node_modules\electron\dist"
+  $electronExePath = Join-Path $electronDistPath "electron.exe"
+
+  if (Test-Path -LiteralPath $electronExePath) {
+    return $electronDistPath
+  }
+
+  $electronVersion = Get-ElectronVersion -RepoRootPath $RepoRootPath
+  $electronZip = Join-Path $RuntimeRootPath "electron-v$electronVersion-win32-x64.zip"
+  $electronExtract = Join-Path $RuntimeRootPath "electron-v$electronVersion-win32-x64"
+  $electronUrl = "https://github.com/electron/electron/releases/download/v$electronVersion/electron-v$electronVersion-win32-x64.zip"
+
+  Write-Step "Downloading Electron runtime"
+  Download-File -Url $electronUrl -Destination $electronZip
+  New-CleanDirectory -Path $electronExtract
+  Expand-Archive -LiteralPath $electronZip -DestinationPath $electronExtract -Force
+  Assert-Path -Path (Join-Path $electronExtract "electron.exe") -Description "downloaded Electron runtime"
+
+  New-CleanDirectory -Path $electronDistPath
+  Copy-DirectoryContents -Source $electronExtract -Destination $electronDistPath
+
+  return $electronDistPath
+}
+
 $repoRootPath = Resolve-FullPath $RepoRoot
 if ([string]::IsNullOrWhiteSpace($BundleRoot)) {
   $BundleRoot = Join-Path $repoRootPath "dist\windows\bundle"
 }
 $bundleRootPath = Resolve-FullPath $BundleRoot
-$runtimeRoot = Join-Path $repoRootPath ".runtime\windows-bundle"
+if ([string]::IsNullOrWhiteSpace($RuntimeRoot)) {
+  $RuntimeRoot = Join-Path $repoRootPath ".runtime\windows-bundle"
+}
+$runtimeRoot = Resolve-FullPath $RuntimeRoot
 
 Write-Step "Preparing Windows bundle directories"
 New-CleanDirectory -Path $bundleRootPath
 New-Item -ItemType Directory -Force -Path $runtimeRoot | Out-Null
 
 Write-Step "Staging Electron desktop application"
-$electronDist = Join-Path $repoRootPath "node_modules\electron\dist"
+$electronDist = Ensure-ElectronRuntime -RepoRootPath $repoRootPath -RuntimeRootPath $runtimeRoot
 $nativeDist = Join-Path $repoRootPath "apps\native\dist"
 $desktopTarget = Join-Path $bundleRootPath "app"
 

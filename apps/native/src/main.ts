@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -61,10 +62,20 @@ const electronProcess = process as typeof process & {
   defaultApp?: boolean;
   resourcesPath?: string;
 };
-const currentDir =
-  electronProcess.resourcesPath && !electronProcess.defaultApp
-    ? path.join(electronProcess.resourcesPath, "app.asar")
-    : path.join(process.cwd(), "dist");
+function resolveCurrentDir() {
+  if (!electronProcess.resourcesPath || electronProcess.defaultApp) {
+    return path.join(process.cwd(), "dist");
+  }
+
+  const asarAppPath = path.join(electronProcess.resourcesPath, "app.asar");
+  if (existsSync(asarAppPath)) {
+    return asarAppPath;
+  }
+
+  return path.join(electronProcess.resourcesPath, "app");
+}
+
+const currentDir = resolveCurrentDir();
 const packagedRendererHost = process.env.KHOMP_STACK_DESKTOP_HOST?.trim() || "127.0.0.1";
 const packagedRendererPort = Number.parseInt(
   process.env.KHOMP_STACK_DESKTOP_PORT?.trim() || "3001",
