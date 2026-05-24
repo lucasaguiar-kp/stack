@@ -13,6 +13,10 @@ env:
   FREESWITCH_VERSION: 1.10.12
   FREESWITCH_MSI_URL: http://files.freeswitch.org/windows/installer/x64/FreeSWITCH-1.10.12-Release-x64.msi
   FFMPEG_ZIP_URL: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+  MOSQUITTO_INSTALLER_URL: https://mosquitto.org/files/binary/win64/mosquitto-2.1.2-install-windows-x64.exe
+  WINSW_URL: https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe
+  POSTGRES_INSTALLER_URL: https://get.enterprisedb.com/postgresql/postgresql-16.13-3-windows-x64.exe
+  APP_VERSION: 0.1.0
 
 jobs:
   build-windows:
@@ -43,32 +47,42 @@ jobs:
       - name: Build multicast agent executable
         run: bun run --cwd apps/multicast-agent build
 
-      - name: Download Windows runtime dependencies
+      - name: Build desktop application
+        run: bun run build:desktop
+
+      - name: Stage full Windows bundle
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          .\ops\windows\scripts\stage-bundle.ps1 `
+            -FreeSwitchVersion "${env:FREESWITCH_VERSION}" `
+            -FreeSwitchMsiUrl "${env:FREESWITCH_MSI_URL}" `
+            -FfmpegZipUrl "${env:FFMPEG_ZIP_URL}" `
+            -MosquittoInstallerUrl "${env:MOSQUITTO_INSTALLER_URL}" `
+            -WinSWUrl "${env:WINSW_URL}" `
+            -PostgresInstallerUrl "${env:POSTGRES_INSTALLER_URL}"
 
-          New-Item -ItemType Directory -Force -Path ".runtime\freeswitch", ".runtime\ffmpeg" | Out-Null
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
 
-          Invoke-WebRequest -Uri "${env:FREESWITCH_MSI_URL}" -OutFile ".runtime\freeswitch\FreeSWITCH-${env:FREESWITCH_VERSION}-Release-x64.msi"
-          Invoke-WebRequest -Uri "${env:FFMPEG_ZIP_URL}" -OutFile ".runtime\ffmpeg\ffmpeg-release-essentials.zip"
-
-          Expand-Archive ".runtime\ffmpeg\ffmpeg-release-essentials.zip" ".runtime\ffmpeg" -Force
-          $ffmpegBin = Get-ChildItem ".runtime\ffmpeg" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
-          if ($null -eq $ffmpegBin) {
-            throw "ffmpeg.exe was not found after extracting the FFmpeg archive."
+      - name: Compile Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if ($null -eq $iscc) {
+            throw "ISCC.exe was not found after installing Inno Setup."
           }
-
-          New-Item -ItemType Directory -Force -Path "artifacts\windows\bin", "artifacts\windows\runtime\freeswitch", "artifacts\windows\runtime\ffmpeg" | Out-Null
-          Copy-Item "apps\server\server.exe" "artifacts\windows\bin\server.exe"
-          Copy-Item "apps\ingest\ingest.exe" "artifacts\windows\bin\ingest.exe"
-          Copy-Item "apps\multicast-agent\multicast-agent.exe" "artifacts\windows\bin\multicast-agent.exe"
-          Copy-Item ".runtime\freeswitch\FreeSWITCH-${env:FREESWITCH_VERSION}-Release-x64.msi" "artifacts\windows\runtime\freeswitch\"
-          Copy-Item $ffmpegBin.FullName "artifacts\windows\runtime\ffmpeg\ffmpeg.exe"
+          & $iscc.FullName "/DAppVersion=${env:APP_VERSION}" "ops\windows\installer\khomp-stack.iss"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: stack-pbx-windows
-          path: artifacts/windows
+          path: |
+            dist/windows/installer/*.exe
+            dist/windows/bundle
           if-no-files-found: error
