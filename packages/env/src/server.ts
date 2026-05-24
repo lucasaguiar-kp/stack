@@ -18,6 +18,7 @@ const rawEnv = createEnv({
     CORS_ORIGIN: z.url(),
     FRONTEND_URL: z.url().optional(),
     APP_INSTALL_DIR: z.string().min(1).optional(),
+    APP_VERSION: z.string().min(1).optional(),
     APP_GIT_REMOTE_URL: z.string().min(1).optional(),
     APP_GIT_BRANCH: z.string().min(1).optional(),
     APP_CURRENT_COMMIT: z.string().min(1).optional(),

@@ -28,6 +28,9 @@ type ElectronMainModule = {
       listener: (_event: unknown, ...args: unknown[]) => unknown,
     ) => void;
   };
+  shell: {
+    openExternal: (url: string) => Promise<void>;
+  };
   session: {
     defaultSession: {
       setPermissionRequestHandler: (
@@ -63,6 +66,7 @@ const loadElectron = () => require("electron");
 let app: ElectronMainModule["app"];
 let BrowserWindow: ElectronMainModule["BrowserWindow"];
 let ipcMain: ElectronMainModule["ipcMain"];
+let shell: ElectronMainModule["shell"];
 let session: ElectronMainModule["session"];
 
 const devServerUrl = process.env.KHOMP_STACK_DESKTOP_DEV_URL?.trim() || null;
@@ -385,11 +389,25 @@ function registerIpcHandlers() {
 
     return queryWindowsServiceStatus(serviceName.trim());
   });
+
+  ipcMain.handle("desktop:open-external-url", async (_event, url: unknown) => {
+    if (typeof url !== "string") {
+      return false;
+    }
+
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+      return false;
+    }
+
+    await shell.openExternal(parsedUrl.toString());
+    return true;
+  });
 }
 
 async function bootstrap() {
   const electron = loadElectron();
-  ({ app, BrowserWindow, ipcMain, session } = electron);
+  ({ app, BrowserWindow, ipcMain, session, shell } = electron);
 
   registerIpcHandlers();
 

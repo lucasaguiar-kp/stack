@@ -2,7 +2,8 @@
 param(
   [string]$InstallRoot = $(Split-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -Parent),
   [string]$ProgramDataRoot = "C:\ProgramData\Khomp Stack",
-  [string]$WinSWExecutablePath = ""
+  [string]$WinSWExecutablePath = "",
+  [string]$AppVersion = "0.0.0"
 )
 
 Set-StrictMode -Version Latest
@@ -795,7 +796,7 @@ $resolvedWinSWPath = Resolve-WinSWExecutablePath `
 $bootstrapScriptPath = Join-Path $PSScriptRoot "bootstrap-config.ps1"
 Assert-PathExists -Path $bootstrapScriptPath -Description "Bootstrap script"
 
-$bootstrapResult = & $bootstrapScriptPath -ProgramDataRoot $programDataRootPath -InstallRoot $installRootPath
+$bootstrapResult = & $bootstrapScriptPath -ProgramDataRoot $programDataRootPath -InstallRoot $installRootPath -AppVersion $AppVersion
 $runtimeEnvPath = Join-Path $programDataRootPath "config\service-runtime.env"
 Assert-PathExists -Path $runtimeEnvPath -Description "Service runtime env file"
 $runtimeValues = Read-EnvFile -Path $runtimeEnvPath

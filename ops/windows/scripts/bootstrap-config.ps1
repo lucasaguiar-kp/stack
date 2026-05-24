@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [string]$ProgramDataRoot = "C:\ProgramData\Khomp Stack",
-  [string]$InstallRoot = $(Split-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -Parent)
+  [string]$InstallRoot = $(Split-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -Parent),
+  [string]$AppVersion = "0.0.0"
 )
 
 Set-StrictMode -Version Latest
@@ -266,6 +267,9 @@ $mqttBrokerPort = if (
 
 $runtimeValues = @{
   APP_INSTALL_DIR = $installRootPath
+  APP_VERSION = $AppVersion
+  APP_GIT_REMOTE_URL = "https://github.com/lucasaguiar-kp/stack.git"
+  APP_GIT_BRANCH = "main"
   BETTER_AUTH_SECRET = $betterAuthSecret
   BETTER_AUTH_URL = "http://127.0.0.1:3000"
   CORS_ORIGIN = "http://127.0.0.1:3001"

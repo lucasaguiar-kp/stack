@@ -16,6 +16,10 @@ function shortCommit(value: string | null) {
   return value ? value.slice(0, 7) : "n/a";
 }
 
+function displayVersion(value: string | null) {
+  return value ? `v${value.replace(/^v/i, "")}` : "n/a";
+}
+
 export function SystemUpdateCard() {
   const [open, setOpen] = useState(false);
   const statusQuery = useQuery(orpc.system.updateStatus.queryOptions());
@@ -27,10 +31,16 @@ export function SystemUpdateCard() {
         hasUpdate: false,
         repository: null,
         branch: null,
+        currentVersion: null,
+        latestVersion: null,
+        latestTag: null,
         currentCommit: null,
         latestCommit: null,
         installDirectory: null,
-        updateCommand: 'powershell -ExecutionPolicy Bypass -File ".\\update-windows.ps1"',
+        updateCommand: "Abra a ultima release do GitHub e execute o instalador mais recente.",
+        releaseUrl: null,
+        installerDownloadUrl: null,
+        installerAssetName: null,
         unavailableReason: "Carregando status da atualizacao.",
         checkedAt: new Date().toISOString(),
       }
@@ -41,13 +51,13 @@ export function SystemUpdateCard() {
     ? {
         icon: Download,
         title: "Atualizacao disponivel",
-        description: "Existe uma nova versao remota pronta para ser aplicada.",
+        description: "Existe uma nova release no GitHub pronta para instalar.",
       }
     : status.isConfigured
       ? {
           icon: CheckCircle2,
           title: "Sistema atualizado",
-          description: "A instalacao atual ja esta alinhada com a branch configurada.",
+          description: "A instalacao atual ja esta alinhada com a ultima release.",
         }
       : {
           icon: BadgeAlert,
@@ -67,7 +77,7 @@ export function SystemUpdateCard() {
               Atualizacao do sistema
             </CardTitle>
             <CardDescription>
-              Verifique se existe uma nova versao do painel e abra o passo a passo de update.
+              Verifique se existe uma nova release e baixe o instalador pelo GitHub.
             </CardDescription>
           </div>
 
@@ -88,15 +98,15 @@ export function SystemUpdateCard() {
 
           <div className="grid gap-2 rounded-xl border bg-muted/20 p-4 text-sm sm:min-w-64">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Branch</span>
-              <span className="font-medium">{status.branch ?? "n/a"}</span>
+              <span className="text-muted-foreground">Instalada</span>
+              <span className="font-medium">{displayVersion(status.currentVersion)}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Atual</span>
-              <span className="font-mono">{shortCommit(status.currentCommit)}</span>
+              <span className="text-muted-foreground">Release</span>
+              <span className="font-medium">{displayVersion(status.latestVersion)}</span>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">Remoto</span>
+              <span className="text-muted-foreground">Commit</span>
               <span className="font-mono">{shortCommit(status.latestCommit)}</span>
             </div>
           </div>

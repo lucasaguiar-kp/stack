@@ -8,10 +8,16 @@ interface SystemUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
   status: {
     branch: string | null;
+    currentVersion: string | null;
+    latestVersion: string | null;
+    latestTag: string | null;
     currentCommit: string | null;
     latestCommit: string | null;
     repository: string | null;
     updateCommand: string;
+    releaseUrl: string | null;
+    installerDownloadUrl: string | null;
+    installerAssetName: string | null;
     hasUpdate: boolean;
     unavailableReason: string | null;
   };
@@ -19,6 +25,10 @@ interface SystemUpdateDialogProps {
 
 function shortCommit(value: string | null) {
   return value ? value.slice(0, 7) : "n/a";
+}
+
+function displayVersion(value: string | null) {
+  return value ? `v${value.replace(/^v/i, "")}` : "n/a";
 }
 
 export function SystemUpdateDialog({ open, onOpenChange, status }: SystemUpdateDialogProps) {
@@ -50,6 +60,33 @@ export function SystemUpdateDialog({ open, onOpenChange, status }: SystemUpdateD
     }
   }
 
+  async function openUrl(url: string | null) {
+    if (!url) {
+      return;
+    }
+
+    const desktopApi = (
+      window as typeof window & {
+        khompStackDesktop?: {
+          openExternalUrl?: (targetUrl: string) => Promise<boolean>;
+        };
+      }
+    ).khompStackDesktop;
+
+    try {
+      if (desktopApi?.openExternalUrl) {
+        const opened = await desktopApi.openExternalUrl(url);
+        if (opened) {
+          return;
+        }
+      }
+
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6 backdrop-blur-xs">
       <div className="w-full max-w-2xl rounded-2xl border bg-background shadow-2xl">
@@ -57,8 +94,7 @@ export function SystemUpdateDialog({ open, onOpenChange, status }: SystemUpdateD
           <div className="space-y-1">
             <h2 className="text-lg font-semibold">Atualizar sistema</h2>
             <p className="text-sm text-muted-foreground">
-              Use o comando abaixo no Windows PowerShell para baixar a ultima versao e recriar os
-              containers.
+              Baixe o instalador publicado na ultima release do GitHub e execute no Windows.
             </p>
           </div>
 
@@ -71,23 +107,23 @@ export function SystemUpdateDialog({ open, onOpenChange, status }: SystemUpdateD
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border bg-muted/30 p-4">
               <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Branch
+                Release
               </div>
-              <div className="mt-2 font-medium">{status.branch ?? "n/a"}</div>
+              <div className="mt-2 font-medium">{status.latestTag ?? status.branch ?? "n/a"}</div>
             </div>
 
             <div className="rounded-xl border bg-muted/30 p-4">
               <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Atual
+                Instalada
               </div>
-              <div className="mt-2 font-mono text-sm">{shortCommit(status.currentCommit)}</div>
+              <div className="mt-2 font-medium">{displayVersion(status.currentVersion)}</div>
             </div>
 
             <div className="rounded-xl border bg-muted/30 p-4">
               <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Remoto
+                Disponivel
               </div>
-              <div className="mt-2 font-mono text-sm">{shortCommit(status.latestCommit)}</div>
+              <div className="mt-2 font-medium">{displayVersion(status.latestVersion)}</div>
             </div>
           </div>
 
@@ -107,11 +143,17 @@ export function SystemUpdateDialog({ open, onOpenChange, status }: SystemUpdateD
             </div>
 
             <pre className="overflow-x-auto rounded-lg border bg-background p-4 font-mono text-xs leading-6 whitespace-pre-wrap">
-              {status.updateCommand}
+              {status.installerAssetName ?? status.updateCommand}
             </pre>
 
             {status.unavailableReason ? (
               <p className="mt-3 text-xs text-muted-foreground">{status.unavailableReason}</p>
+            ) : null}
+
+            {status.latestCommit ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Commit da release: <span className="font-mono">{shortCommit(status.latestCommit)}</span>
+              </p>
             ) : null}
           </div>
 
@@ -137,10 +179,27 @@ export function SystemUpdateDialog({ open, onOpenChange, status }: SystemUpdateD
             Fechar
           </Button>
 
-          <Button onClick={() => void handleCopy()}>
-            <Copy data-icon="inline-start" />
-            Copiar comando
-          </Button>
+          <div className="flex items-center gap-2">
+            {status.releaseUrl ? (
+              <Button variant="outline" onClick={() => void openUrl(status.releaseUrl)}>
+                <ExternalLink data-icon="inline-start" />
+                Abrir release
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => void handleCopy()}>
+                <Copy data-icon="inline-start" />
+                Copiar comando
+              </Button>
+            )}
+
+            <Button
+              onClick={() => void openUrl(status.installerDownloadUrl)}
+              disabled={!status.installerDownloadUrl}
+            >
+              <Download data-icon="inline-start" />
+              Baixar instalador
+            </Button>
+          </div>
         </div>
       </div>
     </div>

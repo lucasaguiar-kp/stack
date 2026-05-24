@@ -217,6 +217,8 @@ begin
     ExpandConstant('{app}') +
     '" -ProgramDataRoot "' +
     ExpandConstant('{commonappdata}\Khomp Stack') +
+    '" -AppVersion "' +
+    '{#AppVersion}' +
     '"';
 
   if (not Exec('powershell.exe', Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode)) or

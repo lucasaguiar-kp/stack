@@ -20,6 +20,7 @@ type DesktopRuntimeInfo = {
 type DesktopApi = {
   getRuntimeInfo: () => Promise<DesktopRuntimeInfo>;
   getServiceStatus: (serviceName: string) => Promise<DesktopServiceStatus>;
+  openExternalUrl: (url: string) => Promise<boolean>;
 };
 
 declare const require: (moduleName: string) => {
@@ -41,6 +42,8 @@ const desktopApi: DesktopApi = {
       "windows:get-service-status",
       serviceName,
     )) as DesktopServiceStatus,
+  openExternalUrl: async (url) =>
+    (await electron.ipcRenderer.invoke("desktop:open-external-url", url)) as boolean,
 };
 
 electron.contextBridge.exposeInMainWorld("khompStackDesktop", desktopApi);
