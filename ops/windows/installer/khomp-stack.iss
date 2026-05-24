@@ -17,8 +17,8 @@
 #ifnexist BundleRoot + "app\" + DesktopExecutableName
   #error "Missing required bundle file: " + BundleRoot + "app\" + DesktopExecutableName + ". Stage the full Windows bundle before compiling the installer."
 #endif
-#ifnexist BundleRoot + "app\resources"
-  #error "Missing required bundle directory: " + BundleRoot + "app\resources. Stage the full Windows bundle before compiling the installer."
+#ifnexist BundleRoot + "app\resources\app\main.js"
+  #error "Missing required bundle file: " + BundleRoot + "app\resources\app\main.js. Stage the full Windows bundle before compiling the installer."
 #endif
 #ifnexist BundleRoot + "backend\server.exe"
   #error "Missing required bundle file: " + BundleRoot + "backend\server.exe. Stage the full Windows bundle before compiling the installer."
