@@ -644,6 +644,36 @@ function Wait-ServiceState {
   throw "Service '$Name' did not reach state '$DesiredStatus' within $TimeoutSeconds seconds."
 }
 
+function Wait-HttpEndpoint {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Url,
+    [int]$TimeoutSeconds = 60,
+    [int]$PollIntervalMilliseconds = 1000
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $lastError = $null
+
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
+
+      if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
+        return $true
+      }
+
+      $lastError = "HTTP $($response.StatusCode)"
+    } catch {
+      $lastError = $_.Exception.Message
+    }
+
+    Start-Sleep -Milliseconds $PollIntervalMilliseconds
+  }
+
+  throw "HTTP endpoint '$Url' did not become available within $TimeoutSeconds seconds. Last error: $lastError"
+}
+
 function Resolve-WinSWExecutablePath {
   param(
     [Parameter(Mandatory = $true)]
@@ -749,6 +779,14 @@ function Install-KhompService {
 
 $installRootPath = Get-FullPath -Path $InstallRoot
 $programDataRootPath = Get-FullPath -Path $ProgramDataRoot
+$installLogRoot = Join-Path $programDataRootPath "logs"
+New-Item -Path $installLogRoot -ItemType Directory -Force | Out-Null
+try {
+  Start-Transcript -Path (Join-Path $installLogRoot "install-services.log") -Append | Out-Null
+} catch {
+  Write-Warning "Failed to start install transcript: $($_.Exception.Message)"
+}
+
 $resolvedWinSWPath = Resolve-WinSWExecutablePath `
   -InstallRootPath $installRootPath `
   -ScriptRootPath $PSScriptRoot `
@@ -817,6 +855,9 @@ $installedServices = foreach ($service in $services) {
     -RuntimeValues $runtimeValues
 }
 
+$backendPort = [int]$runtimeValues["PORT"]
+$null = Wait-HttpEndpoint -Url "http://127.0.0.1:$backendPort/" -TimeoutSeconds 90
+
 [pscustomobject]@{
   RuntimeEnvPath = $runtimeEnvPath
   RuntimeValues = $runtimeValues
@@ -826,4 +867,10 @@ $installedServices = foreach ($service in $services) {
   FreeSwitchResult = $freeSwitchResult
   PostgresResult = $postgresResult
   InstalledServices = $installedServices
+}
+
+try {
+  Stop-Transcript | Out-Null
+} catch {
+  Write-Warning "Failed to stop install transcript: $($_.Exception.Message)"
 }

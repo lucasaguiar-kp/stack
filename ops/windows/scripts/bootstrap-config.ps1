@@ -299,6 +299,7 @@ $runtimeValues = @{
   MULTICAST_TTL = "32"
   NODE_ENV = "production"
   PBX_HOST = $pbxHost
+  PORT = "3000"
   WINDOWS_PROGRAM_DATA_DIR = $programDataRootPath
   WINDOWS_PROGRAM_FILES_DIR = $installRootPath
 }

@@ -142,10 +142,6 @@ Name: "{autoprograms}\Khomp Stack\Khomp Stack Desktop"; Filename: "{app}\app\{#D
 Name: "{autodesktop}\Khomp Stack Desktop"; Filename: "{app}\app\{#DesktopExecutableName}"; Tasks: desktopicon
 
 [Run]
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\ops\windows\scripts\install-services.ps1"" -InstallRoot ""{app}"" -ProgramDataRoot ""{commonappdata}\Khomp Stack"""; \
-  Flags: runhidden waituntilterminated; \
-  StatusMsg: "Registering Khomp Stack background services..."
 Filename: "{app}\app\{#DesktopExecutableName}"; \
   Description: "Launch Khomp Stack Desktop"; \
   Flags: nowait postinstall skipifsilent; \
@@ -200,10 +196,46 @@ begin
   Exec('powershell.exe', Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
+procedure InstallKhompServices();
+var
+  ResultCode: Integer;
+  Command: string;
+  LogPath: string;
+begin
+  WizardForm.StatusLabel.Caption := 'Registering Khomp Stack background services...';
+  LogPath := ExpandConstant('{commonappdata}\Khomp Stack\logs\install-services.log');
+  Command :=
+    '-NoProfile -ExecutionPolicy Bypass -File "' +
+    ExpandConstant('{app}\ops\windows\scripts\install-services.ps1') +
+    '" -InstallRoot "' +
+    ExpandConstant('{app}') +
+    '" -ProgramDataRoot "' +
+    ExpandConstant('{commonappdata}\Khomp Stack') +
+    '"';
+
+  if (not Exec('powershell.exe', Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode)) or
+     (ResultCode <> 0) then
+  begin
+    MsgBox(
+      'Khomp Stack services could not be started. The installation will stop before launching the desktop.' + #13#10 + #13#10 +
+      'PowerShell exit code: ' + IntToStr(ResultCode) + #13#10 +
+      'Check the service logs under: ' + LogPath,
+      mbError,
+      MB_OK
+    );
+    Abort;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
   begin
     StopRunningKhompProcesses();
+  end;
+
+  if CurStep = ssPostInstall then
+  begin
+    InstallKhompServices();
   end;
 end;
