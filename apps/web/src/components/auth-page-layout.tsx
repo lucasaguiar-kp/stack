@@ -1,4 +1,4 @@
-import { LockKeyhole } from "lucide-react";
+import { AlertTriangle, LockKeyhole, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
@@ -9,8 +9,36 @@ import Loader from "@/components/loader";
 import { useQuery } from "@tanstack/react-query";
 import { orpc } from "@/utils/orpc";
 
+type DesktopServiceStatus = {
+  name: string;
+  found: boolean;
+  state: {
+    label: string;
+    isRunning: boolean;
+  };
+  error: string | null;
+};
+
+declare global {
+  interface Window {
+    khompStackDesktop?: {
+      getServiceStatus: (serviceName: string) => Promise<DesktopServiceStatus>;
+    };
+  }
+}
+
+const WINDOWS_SERVICE_NAMES = [
+  "KhompStack-Backend",
+  "KhompStack-Mqtt",
+  "KhompStack-FreeSWITCH",
+  "KhompStack-Ingest",
+  "KhompStack-MulticastAgent",
+];
+
 export function AuthPageLayout({ defaultTab }: { defaultTab: "sign-in" | "sign-up" }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const [serviceStatuses, setServiceStatuses] = useState<DesktopServiceStatus[]>([]);
+  const [isCheckingServices, setIsCheckingServices] = useState(false);
   const setupStatus = useQuery(orpc.setup.status.queryOptions());
   const allowRegistration = setupStatus.data?.allowRegistration ?? false;
   const isFirstAccess = setupStatus.data?.hasUsers === false;
@@ -26,8 +54,87 @@ export function AuthPageLayout({ defaultTab }: { defaultTab: "sign-in" | "sign-u
     }
   }, [activeTab, allowRegistration, isFirstAccess]);
 
+  async function checkWindowsServices() {
+    if (!window.khompStackDesktop) {
+      return;
+    }
+
+    setIsCheckingServices(true);
+    try {
+      const statuses = await Promise.all(
+        WINDOWS_SERVICE_NAMES.map((serviceName) =>
+          window.khompStackDesktop!.getServiceStatus(serviceName),
+        ),
+      );
+      setServiceStatuses(statuses);
+    } finally {
+      setIsCheckingServices(false);
+    }
+  }
+
+  useEffect(() => {
+    if (setupStatus.isError) {
+      void checkWindowsServices();
+    }
+  }, [setupStatus.isError]);
+
   if (setupStatus.isLoading) {
     return <Loader />;
+  }
+
+  if (setupStatus.isError) {
+    const errorMessage =
+      setupStatus.error instanceof Error ? setupStatus.error.message : "Failed to fetch";
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground">
+        <Card className="w-full max-w-2xl border-destructive/40">
+          <CardHeader className="gap-3">
+            <Badge variant="destructive" className="w-fit gap-2">
+              <AlertTriangle className="size-3.5" />
+              Backend local indisponivel
+            </Badge>
+            <div className="space-y-1.5">
+              <CardTitle>Khomp Stack nao conseguiu conectar na API local</CardTitle>
+              <CardDescription>
+                O desktop abriu, mas o backend em http://127.0.0.1:3000 nao respondeu.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 font-mono text-xs">
+              {errorMessage}
+            </div>
+
+            {serviceStatuses.length > 0 ? (
+              <div className="grid gap-2">
+                {serviceStatuses.map((service) => (
+                  <div
+                    key={service.name}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                  >
+                    <span className="font-medium">{service.name}</span>
+                    <Badge variant={service.state.isRunning ? "secondary" : "destructive"}>
+                      {service.found ? service.state.label : "NOT FOUND"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+              Verifique os logs em C:\ProgramData\Khomp Stack\logs, principalmente
+              install-services.log e backend.
+            </div>
+
+            <Button onClick={() => void checkWindowsServices()} disabled={isCheckingServices}>
+              <RefreshCw data-icon="inline-start" />
+              {isCheckingServices ? "Verificando" : "Verificar servicos"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

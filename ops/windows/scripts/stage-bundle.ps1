@@ -151,6 +151,7 @@ $serviceTargets = @{
   "backend\server.exe" = "apps\server\server.exe"
   "ingest\ingest.exe" = "apps\ingest\ingest.exe"
   "multicast-agent\multicast-agent.exe" = "apps\multicast-agent\multicast-agent.exe"
+  "multicast-agent\rtp-sender.exe" = "apps\multicast-agent\rtp-sender.exe"
 }
 
 foreach ($entry in $serviceTargets.GetEnumerator()) {
@@ -222,6 +223,7 @@ $requiredFiles = @(
   "backend\server.exe",
   "ingest\ingest.exe",
   "multicast-agent\multicast-agent.exe",
+  "multicast-agent\rtp-sender.exe",
   "ffmpeg\ffmpeg.exe",
   "freeswitch\FreeSwitchConsole.exe",
   "freeswitch\mod\mod_conference.dll",
@@ -230,6 +232,7 @@ $requiredFiles = @(
   "vendor\winsw\WinSW-x64.exe",
   "vendor\postgresql\postgresql-16.13-3-windows-x64.exe",
   "ops\windows\scripts\bootstrap-config.ps1",
+  "ops\windows\scripts\diagnose-install.ps1",
   "ops\windows\scripts\init-postgres.ps1",
   "ops\windows\scripts\install-services.ps1",
   "ops\windows\scripts\uninstall-services.ps1",

@@ -77,8 +77,7 @@ describe("multicast session manager", () => {
       ttl: 32,
     });
 
-    expect(args[0]?.endsWith("rtp-sender.cjs")).toBe(true);
-    expect(args.slice(1)).toEqual(["239.255.0.1", "16384", "172.30.254.26", "32", "160", "pcma"]);
+    expect(args).toEqual(["239.255.0.1", "16384", "172.30.254.26", "32", "160", "pcma"]);
   });
 
   test("starts and stops a multicast session", async () => {

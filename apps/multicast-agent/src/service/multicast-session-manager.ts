@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { rmSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -46,6 +46,21 @@ const senderScriptPath = path.join(currentDir, "rtp-sender.cjs");
 const repoRoot = path.resolve(currentDir, "../../../../");
 export const MULTICAST_SHARED_AUDIO_ROOT = path.join(repoRoot, ".runtime", "multicast-agent-inputs");
 
+function resolveSenderExecutablePath() {
+  const candidates = [
+    process.env.APP_INSTALL_DIR
+      ? path.join(process.env.APP_INSTALL_DIR, "multicast-agent", "rtp-sender.exe")
+      : null,
+    process.env.WINDOWS_PROGRAM_FILES_DIR
+      ? path.join(process.env.WINDOWS_PROGRAM_FILES_DIR, "multicast-agent", "rtp-sender.exe")
+      : null,
+    path.join(process.cwd(), "multicast-agent", "rtp-sender.exe"),
+    path.join(process.cwd(), "rtp-sender.exe"),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
 export function buildFfmpegArgs({ audioCodec = "pcma", sourceType, source }: BuildFfmpegArgsInput) {
   const inputArgs =
     sourceType === "radio_url" || sourceType === "audio_file"
@@ -77,7 +92,6 @@ export function buildSenderArgs(input: {
   ttl: number;
 }) {
   return [
-    senderScriptPath,
     input.multicastAddress,
     String(input.port),
     input.localAddress ?? "",
@@ -102,7 +116,13 @@ export class MulticastSessionManager {
     let ffmpegProcess: ManagedProcess | undefined;
 
     try {
-      senderProcess = this.spawnProcess("node", buildSenderArgs(input), {
+      const senderExecutablePath = resolveSenderExecutablePath();
+      const senderCommand = senderExecutablePath ?? "node";
+      const senderArgs = senderExecutablePath
+        ? buildSenderArgs(input)
+        : [senderScriptPath, ...buildSenderArgs(input)];
+
+      senderProcess = this.spawnProcess(senderCommand, senderArgs, {
         stdio: ["pipe", "ignore", "pipe"],
       });
 

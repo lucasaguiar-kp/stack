@@ -29,6 +29,9 @@
 #ifnexist BundleRoot + "multicast-agent\multicast-agent.exe"
   #error "Missing required bundle file: " + BundleRoot + "multicast-agent\multicast-agent.exe. Stage the full Windows bundle before compiling the installer."
 #endif
+#ifnexist BundleRoot + "multicast-agent\rtp-sender.exe"
+  #error "Missing required bundle file: " + BundleRoot + "multicast-agent\rtp-sender.exe. Stage the full Windows bundle before compiling the installer."
+#endif
 #ifnexist BundleRoot + "ffmpeg\ffmpeg.exe"
   #error "Missing required bundle file: " + BundleRoot + "ffmpeg\ffmpeg.exe. Stage the full Windows bundle before compiling the installer."
 #endif
@@ -52,6 +55,9 @@
 #endif
 #ifnexist BundleRoot + "ops\windows\scripts\bootstrap-config.ps1"
   #error "Missing required bundle file: " + BundleRoot + "ops\windows\scripts\bootstrap-config.ps1. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\scripts\diagnose-install.ps1"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\scripts\diagnose-install.ps1. Stage the full Windows bundle before compiling the installer."
 #endif
 #ifnexist BundleRoot + "ops\windows\scripts\init-postgres.ps1"
   #error "Missing required bundle file: " + BundleRoot + "ops\windows\scripts\init-postgres.ps1. Stage the full Windows bundle before compiling the installer."

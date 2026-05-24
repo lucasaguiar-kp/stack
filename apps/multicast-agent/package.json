@@ -5,7 +5,7 @@
   "main": "src/server.ts",
   "scripts": {
     "dev": "bun run --hot src/server.ts",
-    "build": "bun build --compile --minify --sourcemap --bytecode ./src/server.ts --outfile multicast-agent",
+    "build": "bun build --compile --minify --sourcemap --bytecode ./src/server.ts --outfile multicast-agent && bun build --compile --minify ./src/service/rtp-sender.cjs --outfile rtp-sender",
     "check-types": "tsc -b",
     "test": "bun test"
   },
