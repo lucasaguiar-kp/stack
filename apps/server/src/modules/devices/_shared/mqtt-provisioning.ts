@@ -1,13 +1,10 @@
 import { env } from "@stack-pbx/env/server";
-import mqtt from "mqtt";
-import { randomUUID } from "node:crypto";
+import { getCurrentLanAddress } from "../../../core/network/lan-address";
 import { AppError } from "../../../core/errors/app-error";
 
 const MAC_ADDRESS_HEX_LENGTH = 12;
 const MQTT_PROVISIONING_TIMEOUT_MS = 5000;
-const MQTT_STATUS_TIMEOUT_MS = 10000;
 const DEFAULT_DEVICE_SIP_PORT = 5060;
-const SUCCESS_MESSAGES = ["success", "204 - OK No Content", "200 - OK"];
 
 type ProvisionDeviceOverMqttInput = {
   deviceIp?: string | null;
@@ -53,22 +50,14 @@ export function normalizeDeviceMacAddress(value: string) {
   return octets.join(":");
 }
 
-function buildBrokerUrl() {
-  if (!env.MQTT_BROKER_HOST) {
-    throw new AppError("MQTT_BROKER_NOT_CONFIGURED");
-  }
-
-  const protocol = env.MQTT_BROKER_USE_TLS ? "mqtts" : "mqtt";
-
-  return `${protocol}://${env.MQTT_BROKER_HOST}:${env.MQTT_BROKER_PORT}`;
-}
-
 function getPbxAddress() {
-  return env.ASTERISK_DEVICE_HOST;
+  return env.PBX_PROVIDER === "freeswitch" ? getCurrentLanAddress() : env.ASTERISK_DEVICE_HOST;
 }
 
 function getPbxSipPort() {
-  return env.ASTERISK_DEVICE_SIP_PORT ?? DEFAULT_DEVICE_SIP_PORT;
+  return env.PBX_PROVIDER === "freeswitch"
+    ? env.FREESWITCH_SIP_PORT
+    : (env.ASTERISK_DEVICE_SIP_PORT ?? DEFAULT_DEVICE_SIP_PORT);
 }
 
 function getPersistentSubscribeTopic(macAddress: string) {
@@ -77,6 +66,47 @@ function getPersistentSubscribeTopic(macAddress: string) {
 
 function getPersistentPublishTopic(macAddress: string) {
   return `${buildDeviceCommandTopic(macAddress)}`;
+}
+
+function buildProvisioningConfig(input: ProvisionDeviceOverMqttInput) {
+  const currentHost = getCurrentLanAddress();
+
+  return {
+    audio: {
+      volume_microphone: 3,
+      volume_speaker: 3,
+      codecs_enabled: ["G711A", "G711U", "G726", "G729A"],
+      dtmf_audio_enabled: true,
+    },
+    mqtt: {
+      mqtt_enabled: true,
+      broker_address: currentHost,
+      mqtt_port: env.MQTT_BROKER_PORT,
+      mqtt_username: env.MQTT_BROKER_USERNAME ?? "",
+      mqtt_password: env.MQTT_BROKER_PASSWORD ?? "",
+      subscribe_topic: getPersistentSubscribeTopic(input.macAddress),
+      publish_topic: getPersistentPublishTopic(input.macAddress),
+      tls_connection_enabled: env.MQTT_BROKER_USE_TLS,
+    },
+    network: {
+      vocalize_ip: true,
+    },
+    sip: {
+      sip_register_on_pabx_enabled: true,
+      pabx_address: getPbxAddress(),
+      pabx_sip_port: getPbxSipPort(),
+      sip_call_ip_port: getPbxSipPort(),
+      username: input.sipUser,
+      display_name: input.extension,
+      auth_username: input.sipUser,
+      user_password: input.sipPassword,
+      stun_enabled: false,
+      stun_address: "stun.l.google.com",
+      stun_port: 19302,
+      send_options_enabled: true,
+      send_options_interval: 120,
+    },
+  };
 }
 
 async function sendDeviceHttpsRequest<TResponse>(input: {
@@ -180,28 +210,19 @@ async function updateDeviceMqttOverHttps(input: ProvisionDeviceOverMqttInput & {
     });
   }
 
-  const brokerAddress = env.PBX_HOST ?? env.MQTT_BROKER_HOST;
+  const brokerAddress = getCurrentLanAddress();
 
   if (!brokerAddress) {
     throw new AppError("MQTT_BROKER_NOT_CONFIGURED");
   }
 
-  const payload = JSON.stringify({
-    mqtt: {
-      mqtt_enabled: true,
-      broker_address: brokerAddress,
-      mqtt_port: env.MQTT_BROKER_PORT,
-      mqtt_username: env.MQTT_BROKER_USERNAME ?? "",
-      mqtt_password: env.MQTT_BROKER_PASSWORD ?? "",
-      subscribe_topic: getPersistentSubscribeTopic(input.macAddress),
-      publish_topic: getPersistentPublishTopic(input.macAddress),
-      tls_connection_enabled: env.MQTT_BROKER_USE_TLS,
-    },
-  });
+  const payload = JSON.stringify(buildProvisioningConfig(input));
 
-  console.info("Updating device MQTT config over HTTPS", {
+  console.info("Updating device MQTT/SIP config over HTTPS", {
     brokerAddress,
     deviceIp: input.deviceIp,
+    pbxAddress: getPbxAddress(),
+    pbxSipPort: getPbxSipPort(),
     publishTopic: getPersistentPublishTopic(input.macAddress),
     subscribeTopic: getPersistentSubscribeTopic(input.macAddress),
     tokenPreview: `${input.token.slice(0, 6)}...`,
@@ -221,14 +242,14 @@ async function updateDeviceMqttOverHttps(input: ProvisionDeviceOverMqttInput & {
         Authorization: `Bearer ${input.token}`,
       },
     });
-    console.info("Device MQTT config updated over HTTPS", { deviceIp: input.deviceIp });
+    console.info("Device MQTT/SIP config updated over HTTPS", { deviceIp: input.deviceIp });
     console.debug("Device MQTT HTTPS response", {
       body: response.body,
       deviceIp: input.deviceIp,
       statusCode: response.statusCode,
     });
   } catch (error) {
-    console.error("Failed to configure device MQTT broker over HTTPS", {
+    console.error("Failed to configure device MQTT/SIP over HTTPS", {
       brokerAddress,
       error: error instanceof Error ? error.message : error,
       deviceIp: input.deviceIp,
@@ -236,113 +257,12 @@ async function updateDeviceMqttOverHttps(input: ProvisionDeviceOverMqttInput & {
     });
     throw error instanceof Error
       ? new AppError("DEVICE_CREATION_FAILED", {
-          message: `Failed to configure device MQTT broker over HTTPS: ${error.message}`,
+      message: `Não foi possível conectar no device pelo IP salvo (${input.deviceIp}). O device pode estar desligado ou pode ter recebido outro IP via DHCP. Erro original: ${error.message}`,
         })
       : new AppError("DEVICE_CREATION_FAILED", {
-          message: "Failed to configure device MQTT broker over HTTPS",
+          message: "Failed to configure device MQTT/SIP over HTTPS",
         });
   }
-}
-
-async function subscribeToDeviceStatusTopic(options: {
-  client: mqtt.MqttClient;
-  macAddress: string;
-}) {
-  const statusTopics = buildDeviceResponseTopics(options.macAddress);
-
-  await new Promise<void>((resolve, reject) => {
-    options.client.subscribe(statusTopics, { qos: 1 }, (error) => {
-      if (error) {
-        reject(
-          new AppError("DEVICE_CREATION_FAILED", {
-            message: `Failed subscribing to device response topics: ${error.message}`,
-          }),
-        );
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
-async function monitorDeviceStatus(options: {
-  client: mqtt.MqttClient;
-  macAddress: string;
-  requestId: string;
-}) {
-  const statusTopics = new Set(buildDeviceResponseTopics(options.macAddress));
-
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-
-    const finish = (error?: Error) => {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      clearTimeout(timeout);
-      options.client.off("message", handleMessage);
-
-      options.client.unsubscribe([...statusTopics], () => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    };
-
-    const handleMessage = (topic: string, payload: Buffer) => {
-      if (!statusTopics.has(topic)) {
-        return;
-      }
-
-      try {
-        const message = JSON.parse(payload.toString()) as {
-          id?: string;
-          status?: string;
-        };
-
-        if (message.id !== options.requestId) {
-          return;
-        }
-
-        if (!message.status) {
-          return;
-        }
-
-        if (!SUCCESS_MESSAGES.includes(message.status)) {
-          finish(
-            new AppError("DEVICE_CREATION_FAILED", {
-              message: "Device rejected the MQTT provisioning payload",
-            }),
-          );
-          return;
-        }
-
-        finish();
-      } catch {
-        finish(
-          new AppError("DEVICE_CREATION_FAILED", {
-            message: "Device returned an invalid MQTT status payload",
-          }),
-        );
-      }
-    };
-
-    const timeout = setTimeout(() => {
-      finish(
-        new AppError("DEVICE_CREATION_FAILED", {
-          message: "Timed out waiting for device MQTT provisioning confirmation",
-        }),
-      );
-    }, MQTT_STATUS_TIMEOUT_MS);
-
-    options.client.on("message", handleMessage);
-  });
 }
 
 export async function provisionDeviceOverMqtt(input: ProvisionDeviceOverMqttInput) {
@@ -364,116 +284,5 @@ export async function provisionDeviceOverMqtt(input: ProvisionDeviceOverMqttInpu
   console.debug("HTTPS MQTT update step finished", {
     deviceIp: input.deviceIp,
     macAddress: input.macAddress,
-  });
-
-  const topic = buildDeviceCommandTopic(input.macAddress);
-  const requestId = randomUUID()
-    .replace(/[^a-fA-F0-9]/g, "")
-    .substring(0, 8);
-
-  const payload = {
-    id: requestId,
-    path: "v1/configs",
-    params: {
-      audio: {
-        volume_microphone: 3,
-        volume_speaker: 3,
-        codecs_enabled: ["G711A", "G711U", "G726", "G729A"],
-        dtmf_audio_enabled: true,
-      },
-      network: {
-        vocalize_ip: false,
-      },
-      sip: {
-        sip_register_on_pabx_enabled: true,
-        pabx_address: getPbxAddress(),
-        pabx_sip_port: getPbxSipPort(),
-        sip_call_ip_port: getPbxSipPort(),
-        username: input.sipUser,
-        display_name: input.extension,
-        auth_username: input.sipUser,
-        user_password: input.sipPassword,
-        stun_enabled: false,
-        stun_address: "stun.l.google.com",
-        stun_port: 19302,
-        send_options_enabled: true,
-        send_options_interval: 120,
-      },
-    },
-  };
-
-  const brokerUrl = buildBrokerUrl();
-
-  await new Promise<void>((resolve, reject) => {
-    const client = mqtt.connect(brokerUrl, {
-      username: env.MQTT_BROKER_USERNAME,
-      password: env.MQTT_BROKER_PASSWORD,
-      reconnectPeriod: 0,
-      connectTimeout: MQTT_PROVISIONING_TIMEOUT_MS,
-    });
-
-    let settled = false;
-
-    const finish = (error?: Error) => {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      clearTimeout(connectTimeout);
-
-      if (error) {
-        client.end(true);
-        reject(
-          new AppError("DEVICE_CREATION_FAILED", {
-            message: `Failed to publish device MQTT provisioning: ${error.message}`,
-          }),
-        );
-        return;
-      }
-
-      client.end(false, undefined, () => resolve());
-    };
-
-    const connectTimeout = setTimeout(() => {
-      finish(new Error("Timed out while connecting to the MQTT broker"));
-    }, MQTT_PROVISIONING_TIMEOUT_MS);
-
-    client.once("error", (error) => finish(error));
-    client.once("connect", async () => {
-      clearTimeout(connectTimeout);
-
-      try {
-        await subscribeToDeviceStatusTopic({
-          client,
-          macAddress: input.macAddress,
-        });
-
-        const statusPromise = monitorDeviceStatus({
-          client,
-          macAddress: input.macAddress,
-          requestId,
-        });
-
-        client.publish(topic, JSON.stringify(payload), { qos: 1 }, (error) => {
-          if (error) {
-            finish(error);
-            return;
-          }
-
-          void statusPromise
-            .then(() => finish())
-            .catch((statusError) => {
-              finish(
-                statusError instanceof Error
-                  ? statusError
-                  : new Error("Unknown MQTT monitoring error"),
-              );
-            });
-        });
-      } catch (error) {
-        finish(error instanceof Error ? error : new Error("Unknown MQTT monitoring error"));
-      }
-    });
   });
 }

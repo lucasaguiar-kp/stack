@@ -1,17 +1,19 @@
 import { env } from "@stack-pbx/env/server";
+import { buildPublicMqttUrl, getNetworkIdentity } from "../../../core/network/lan-address";
 import { getUserPbxCredentials } from "../get-pbx-credentials/service";
 import type { Input, Output } from "./schema";
 
-function getMqttConnectionDetails() {
+function getMqttConnectionDetails(currentHost: string) {
   const configured = Boolean(env.MQTT_PUBLIC_URL || env.MQTT_BROKER_HOST);
   const fallbackProtocol = env.MQTT_BROKER_USE_TLS ? "mqtts" : "mqtt";
-  const fallbackHost = env.MQTT_BROKER_HOST ?? "";
-  const fallbackPort = env.MQTT_BROKER_HOST ? env.MQTT_BROKER_PORT : null;
+  const fallbackHost = currentHost || env.MQTT_BROKER_HOST || "";
+  const fallbackPort = env.MQTT_BROKER_PORT ?? null;
+  const publicUrl = buildPublicMqttUrl(currentHost);
 
   if (!env.MQTT_PUBLIC_URL) {
     return {
       configured,
-      publicUrl: "",
+      publicUrl,
       protocol: fallbackProtocol,
       host: fallbackHost,
       port: fallbackPort,
@@ -22,11 +24,11 @@ function getMqttConnectionDetails() {
   }
 
   try {
-    const parsedUrl = new URL(env.MQTT_PUBLIC_URL);
+    const parsedUrl = new URL(publicUrl);
 
     return {
       configured,
-      publicUrl: env.MQTT_PUBLIC_URL,
+      publicUrl,
       protocol: parsedUrl.protocol.replace(/:$/, "") || fallbackProtocol,
       host: parsedUrl.hostname || fallbackHost,
       port: parsedUrl.port ? Number(parsedUrl.port) : fallbackPort,
@@ -37,7 +39,7 @@ function getMqttConnectionDetails() {
   } catch {
     return {
       configured,
-      publicUrl: env.MQTT_PUBLIC_URL,
+      publicUrl,
       protocol: fallbackProtocol,
       host: fallbackHost,
       port: fallbackPort,
@@ -50,9 +52,11 @@ function getMqttConnectionDetails() {
 
 export async function getUserConnectionInfo(input: Input): Promise<Output> {
   const pbx = await getUserPbxCredentials(input);
+  const network = getNetworkIdentity();
 
   return {
     pbx,
-    mqtt: getMqttConnectionDetails(),
+    mqtt: getMqttConnectionDetails(network.currentHost),
+    network,
   };
 }

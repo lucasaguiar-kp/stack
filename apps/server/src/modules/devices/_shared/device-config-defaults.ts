@@ -1,4 +1,5 @@
 import { env } from "@stack-pbx/env/server";
+import { buildPublicMqttUrl, getCurrentLanAddress } from "../../../core/network/lan-address";
 
 const DEFAULT_AUDIO_CODECS = ["G711A", "G711U", "G726", "G729A"];
 const DEFAULT_MQTT_PORT = 1883;
@@ -52,9 +53,16 @@ export function createProvisionedDeviceConfig(input: {
   sipPassword: string;
   sipUser: string;
 }) {
-  const pbxAddress = env.ASTERISK_DEVICE_HOST ?? "";
-  const sipPort = env.ASTERISK_DEVICE_SIP_PORT ?? DEFAULT_SIP_PORT;
-  const mqttBrokerAddress = env.MQTT_PUBLIC_URL ?? env.MQTT_BROKER_HOST ?? "";
+  const currentHost = getCurrentLanAddress();
+  const pbxAddress =
+    env.PBX_PROVIDER === "freeswitch"
+      ? currentHost
+      : (env.ASTERISK_DEVICE_HOST ?? "");
+  const sipPort =
+    env.PBX_PROVIDER === "freeswitch"
+      ? env.FREESWITCH_SIP_PORT
+      : (env.ASTERISK_DEVICE_SIP_PORT ?? DEFAULT_SIP_PORT);
+  const mqttBrokerAddress = buildPublicMqttUrl(currentHost);
 
   return {
     ...createDefaultDeviceConfig(),
@@ -100,7 +108,7 @@ export function createProvisionedDeviceConfig(input: {
     networkConfig: {
       advanced: {
         httpApiTokenEnabled: true,
-        ipAnnouncementEnabled: false,
+        ipAnnouncementEnabled: true,
       },
       connection: {
         dhcpEnabled: true,

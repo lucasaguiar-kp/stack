@@ -7,9 +7,17 @@ node_modules
 dist
 build
 *.tsbuildinfo
+*.exe
+*.dll
+*.msi
+*.map
+*.pdb
+*.zip
+*.7z
 
 # Environment variables
 .env
+.env.backup
 .env*.local
 
 # IDEs and editors
@@ -48,6 +56,13 @@ coverage
 .cache
 tmp
 temp
+.runtime/
+artifacts/
+release/
+
+# Third-party Windows runtimes are downloaded during local install/CI packaging.
+FreeSWITCH-*-Release-x64/
+ffmpeg/
 
 # Local PBX infrastructure runtime files
 infra/asterisk/generated/**
@@ -66,4 +81,10 @@ infra/mosquitto/log/**
 !infra/mosquitto/log/.gitkeep
 
 .claude
-.github
+
+# Keep GitHub Actions, but avoid committing local assistant metadata/templates.
+.github/*
+!.github/workflows/
+.github/workflows/*
+!.github/workflows/*.yml
+!.github/workflows/*.yaml

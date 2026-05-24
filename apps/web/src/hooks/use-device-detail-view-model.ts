@@ -485,7 +485,7 @@ export function useDeviceDetailViewModel(detail: DeviceDetailData) {
     Boolean(device.extension) &&
     browserPhone.hasCredentials &&
     browserPhone.isSecureContext &&
-    (browserPhone.status === "registered" || browserPhone.status === "idle");
+    browserPhone.status === "registered";
 
   function handleDeviceCall() {
     void browserPhone.call(device.extension).catch((error) => {

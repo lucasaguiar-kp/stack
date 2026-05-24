@@ -82,8 +82,14 @@ export function GroupMulticastDialog({ open, onOpenChange, groupId }: Props) {
 
   const stop = useMutation(
     orpc.group.multicast.stop.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries(orpc.group.multicast.status.queryOptions({ input: { groupId } }));
+      onMutate: () => {
+        const statusQuery = orpc.group.multicast.status.queryOptions({ input: { groupId } });
+        queryClient.setQueryData(statusQuery.queryKey, (current: typeof status.data | undefined) =>
+          current ? { ...current, running: false } : current,
+        );
+      },
+      onSuccess: () => {
+        void queryClient.invalidateQueries(orpc.group.multicast.status.queryOptions({ input: { groupId } }));
         toast.success("Stream multicast parado");
       },
       onError: (e) => toast.error(e.message),

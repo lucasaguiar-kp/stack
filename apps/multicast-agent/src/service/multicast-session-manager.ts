@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 export type MulticastSourceType = "radio_url" | "audio_file";
 
 export type BuildFfmpegArgsInput = {
+  audioCodec?: "pcma" | "pcmu";
   sourceType: MulticastSourceType;
   source: string;
 };
@@ -26,9 +27,12 @@ type Session = {
 
 type StartSessionInput = BuildFfmpegArgsInput & {
   groupId: string;
+  localAddress?: string;
   multicastAddress: string;
   port: number;
   ffmpegPath: string;
+  rtpPayloadSize: number;
+  ttl: number;
 };
 
 type StartSessionResult = { ok: true } | { ok: false; error: string };
@@ -42,11 +46,12 @@ const senderScriptPath = path.join(currentDir, "rtp-sender.cjs");
 const repoRoot = path.resolve(currentDir, "../../../../");
 export const MULTICAST_SHARED_AUDIO_ROOT = path.join(repoRoot, ".runtime", "multicast-agent-inputs");
 
-export function buildFfmpegArgs({ sourceType, source }: BuildFfmpegArgsInput) {
+export function buildFfmpegArgs({ audioCodec = "pcma", sourceType, source }: BuildFfmpegArgsInput) {
   const inputArgs =
     sourceType === "radio_url" || sourceType === "audio_file"
       ? ["-re", "-i", source]
       : ["-i", source];
+  const ffmpegCodec = audioCodec === "pcmu" ? "mulaw" : "alaw";
 
   return [
     "-hide_banner",
@@ -58,13 +63,28 @@ export function buildFfmpegArgs({ sourceType, source }: BuildFfmpegArgsInput) {
     "-ac",
     "1",
     "-f",
-    "mulaw",
+    ffmpegCodec,
     "-",
   ];
 }
 
-export function buildSenderArgs(multicastAddress: string, port: number) {
-  return [senderScriptPath, multicastAddress, String(port)];
+export function buildSenderArgs(input: {
+  localAddress?: string;
+  audioCodec?: "pcma" | "pcmu";
+  multicastAddress: string;
+  port: number;
+  rtpPayloadSize: number;
+  ttl: number;
+}) {
+  return [
+    senderScriptPath,
+    input.multicastAddress,
+    String(input.port),
+    input.localAddress ?? "",
+    String(input.ttl),
+    String(input.rtpPayloadSize),
+    input.audioCodec ?? "pcma",
+  ];
 }
 
 export class MulticastSessionManager {
@@ -82,7 +102,7 @@ export class MulticastSessionManager {
     let ffmpegProcess: ManagedProcess | undefined;
 
     try {
-      senderProcess = this.spawnProcess("node", buildSenderArgs(input.multicastAddress, input.port), {
+      senderProcess = this.spawnProcess("node", buildSenderArgs(input), {
         stdio: ["pipe", "ignore", "pipe"],
       });
 

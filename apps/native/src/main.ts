@@ -1,7 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { queryWindowsServiceStatus } from "./windows/service-status";
 
@@ -28,6 +27,18 @@ type ElectronMainModule = {
       listener: (_event: unknown, ...args: unknown[]) => unknown,
     ) => void;
   };
+  session: {
+    defaultSession: {
+      setPermissionRequestHandler: (
+        handler: (
+          webContents: unknown,
+          permission: string,
+          callback: (granted: boolean) => void,
+          details: Record<string, unknown>,
+        ) => void,
+      ) => void;
+    };
+  };
 };
 
 type RendererServer = {
@@ -35,16 +46,25 @@ type RendererServer = {
   url: string;
 };
 
-const loadElectron = new Function(
-  'return import("electron")',
-) as () => Promise<ElectronMainModule>;
+declare const require: (moduleName: string) => ElectronMainModule;
 
-const electron = await loadElectron();
-const { app, BrowserWindow, ipcMain } = electron;
+const loadElectron = () => require("electron");
+
+let app: ElectronMainModule["app"];
+let BrowserWindow: ElectronMainModule["BrowserWindow"];
+let ipcMain: ElectronMainModule["ipcMain"];
+let session: ElectronMainModule["session"];
 
 const devServerUrl = process.env.KHOMP_STACK_DESKTOP_DEV_URL?.trim() || null;
 const appTitle = process.env.KHOMP_STACK_DESKTOP_TITLE?.trim() || "Khomp Stack";
-const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const electronProcess = process as typeof process & {
+  defaultApp?: boolean;
+  resourcesPath?: string;
+};
+const currentDir =
+  electronProcess.resourcesPath && !electronProcess.defaultApp
+    ? path.join(electronProcess.resourcesPath, "app.asar")
+    : path.join(process.cwd(), "dist");
 const packagedRendererHost = process.env.KHOMP_STACK_DESKTOP_HOST?.trim() || "127.0.0.1";
 const packagedRendererPort = Number.parseInt(
   process.env.KHOMP_STACK_DESKTOP_PORT?.trim() || "3001",
@@ -192,58 +212,102 @@ function createMainWindow() {
     },
   });
 
+  window.show();
+
   window.once("ready-to-show", () => {
     window.show();
   });
 
-  void loadRenderer(window);
+  void loadRenderer(window).catch((error) => {
+    const message = error instanceof Error ? error.stack || error.message : String(error);
+    const html = encodeURIComponent(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${appTitle}</title>
+          <style>
+            body { margin: 0; font-family: Segoe UI, sans-serif; color: #e5e7eb; background: #0f172a; }
+            main { padding: 32px; max-width: 920px; }
+            h1 { font-size: 22px; margin: 0 0 12px; }
+            pre { white-space: pre-wrap; background: #111827; border: 1px solid #334155; padding: 16px; }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>Khomp Stack Desktop failed to load</h1>
+            <pre>${message.replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</pre>
+          </main>
+        </body>
+      </html>
+    `);
+
+    void window.loadURL(`data:text/html;charset=utf-8,${html}`).finally(() => {
+      window.show();
+    });
+  });
 
   return window;
 }
 
-ipcMain.handle("desktop:get-runtime-info", () => ({
-  platform: process.platform,
-  devServerUrl,
-}));
+function registerIpcHandlers() {
+  ipcMain.handle("desktop:get-runtime-info", () => ({
+    platform: process.platform,
+    devServerUrl,
+  }));
 
-ipcMain.handle("windows:get-service-status", async (_event, serviceName: unknown) => {
-  if (typeof serviceName !== "string" || serviceName.trim().length === 0) {
-    return {
-      name: "",
-      found: false,
-      state: {
-        code: null,
-        label: "UNKNOWN",
-        isRunning: false,
-      },
-      error: "A service name is required.",
-      rawOutput: "",
-    };
-  }
+  ipcMain.handle("windows:get-service-status", async (_event, serviceName: unknown) => {
+    if (typeof serviceName !== "string" || serviceName.trim().length === 0) {
+      return {
+        name: "",
+        found: false,
+        state: {
+          code: null,
+          label: "UNKNOWN",
+          isRunning: false,
+        },
+        error: "A service name is required.",
+        rawOutput: "",
+      };
+    }
 
-  return queryWindowsServiceStatus(serviceName.trim());
-});
+    return queryWindowsServiceStatus(serviceName.trim());
+  });
+}
 
-await app.whenReady();
+async function bootstrap() {
+  const electron = loadElectron();
+  ({ app, BrowserWindow, ipcMain, session } = electron);
 
-createMainWindow();
+  registerIpcHandlers();
 
-app.on("activate", () => {
+  await app.whenReady();
+
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === "media");
+  });
+
   createMainWindow();
-});
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+  app.on("activate", () => {
+    createMainWindow();
+  });
 
-app.on("before-quit", () => {
-  if (!packagedRendererServerPromise) {
-    return;
-  }
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
+    }
+  });
 
-  void packagedRendererServerPromise
-    .then((server) => server.close())
-    .catch(() => undefined);
-});
+  app.on("before-quit", () => {
+    if (!packagedRendererServerPromise) {
+      return;
+    }
+
+    void packagedRendererServerPromise
+      .then((server) => server.close())
+      .catch(() => undefined);
+  });
+}
+
+void bootstrap();

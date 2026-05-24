@@ -167,6 +167,12 @@ export function DeviceCard({
               </span>
             </span>
           </div>
+          {isDisconnected ? (
+            <div className="text-muted-foreground rounded border border-dashed px-2 py-1.5 text-[11px] leading-snug">
+              Conexao nao estabelecida. O device pode estar desligado ou o IP pode ter mudado via
+              DHCP.
+            </div>
+          ) : null}
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Ramal</span>
             <span className="font-mono font-medium">{device.extension}</span>

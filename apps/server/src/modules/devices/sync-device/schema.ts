@@ -6,7 +6,9 @@ export const syncDeviceSchema = z.object({
   requesterId: z.string(),
 });
 
-export const syncDeviceOutputSchema = deviceSchema;
+export const syncDeviceOutputSchema = deviceSchema.extend({
+  syncMessage: z.string().optional(),
+});
 
 export type Input = z.infer<typeof syncDeviceSchema>;
 export type Output = z.infer<typeof syncDeviceOutputSchema>;

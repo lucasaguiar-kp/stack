@@ -88,7 +88,10 @@ $installRootPath = Get-FullPath -Path $InstallRoot
 $serviceIds = @(
   "KhompStack-MulticastAgent",
   "KhompStack-Ingest",
-  "KhompStack-Backend"
+  "KhompStack-Backend",
+  "KhompStack-FreeSWITCH",
+  "KhompStack-Asterisk",
+  "KhompStack-Mqtt"
 )
 
 $serviceIds | ForEach-Object {

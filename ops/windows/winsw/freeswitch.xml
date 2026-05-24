@@ -1,0 +1,23 @@
+<service>
+  <id>KhompStack-FreeSWITCH</id>
+  <name>Khomp Stack FreeSWITCH</name>
+  <description>Khomp Stack local PBX service</description>
+  <executable>__INSTALL_ROOT__\freeswitch\FreeSwitchConsole.exe</executable>
+  <arguments>-c -base "__INSTALL_ROOT__\freeswitch" -conf "__PROGRAM_DATA_ROOT__\config\freeswitch" -log "__FREESWITCH_STATE_ROOT__\logs" -db "__FREESWITCH_STATE_ROOT__\db" -run "__FREESWITCH_STATE_ROOT__\run" -mod "__INSTALL_ROOT__\freeswitch\mod" -htdocs "__INSTALL_ROOT__\freeswitch\htdocs" -scripts "__PROGRAM_DATA_ROOT__\config\freeswitch\scripts" -temp "__FREESWITCH_STATE_ROOT__\temp"</arguments>
+  <workingdirectory>__INSTALL_ROOT__\freeswitch</workingdirectory>
+  <logpath>__FREESWITCH_STATE_ROOT__\service-logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10485760</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+  <onfailure action="restart" delay="5 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stopparentprocessfirst>true</stopparentprocessfirst>
+  <stoptimeout>30 sec</stoptimeout>
+  <env name="KHOMP_STACK_INSTALL_ROOT" value="__INSTALL_ROOT__" />
+  <env name="KHOMP_STACK_PROGRAM_DATA_ROOT" value="__PROGRAM_DATA_ROOT__" />
+  <env name="KHOMP_STACK_FREESWITCH_STATE_ROOT" value="__FREESWITCH_STATE_ROOT__" />
+__ENV_ENTRIES__
+</service>

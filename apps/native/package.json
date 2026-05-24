@@ -1,11 +1,11 @@
 {
   "name": "native",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "main": "dist/main.js",
   "scripts": {
     "dev": "bun run build && electron ./dist/main.js",
-    "build": "bun run --cwd ../web build:desktop && bun build ./src/main.ts ./src/preload.ts --outdir ./dist --target=node --external electron && bun -e \"import { cpSync, mkdirSync, rmSync } from 'node:fs'; import path from 'node:path'; const root = process.cwd(); const source = path.join(root, '../web/dist'); const target = path.join(root, 'dist/renderer'); rmSync(target, { recursive: true, force: true }); mkdirSync(path.dirname(target), { recursive: true }); cpSync(source, target, { recursive: true });\"",
+    "build": "bun -e \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true });\" && bun run --cwd ../web build:desktop && bun build ./src/main.ts ./src/preload.ts --outdir ./dist --target=node --format=cjs --external electron && bun -e \"import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'; import path from 'node:path'; const root = process.cwd(); const source = path.join(root, '../web/dist'); const target = path.join(root, 'dist/renderer'); rmSync(target, { recursive: true, force: true }); mkdirSync(path.dirname(target), { recursive: true }); cpSync(source, target, { recursive: true }); writeFileSync(path.join(root, 'dist/package.json'), JSON.stringify({ name: 'khomp-stack-desktop', main: 'main.js' }, null, 2));\"",
     "start": "electron ./dist/main.js",
     "check-types": "tsc -b",
     "test": "bun test"

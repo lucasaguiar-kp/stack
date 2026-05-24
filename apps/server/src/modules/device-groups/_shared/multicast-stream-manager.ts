@@ -19,14 +19,28 @@ export function agentUrl(path: string) {
   return `http://${env.MULTICAST_AGENT_HOST}:${env.MULTICAST_AGENT_PORT}${normalizedPath}`;
 }
 
-async function postToAgent(path: string, payload: unknown) {
-  const response = await fetch(agentUrl(path), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+async function postToAgent(path: string, payload: unknown, options?: { timeoutMs?: number }) {
+  const controller = new AbortController();
+  const timeout =
+    options?.timeoutMs === undefined
+      ? undefined
+      : setTimeout(() => controller.abort(), options.timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(agentUrl(path), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => "");
@@ -60,7 +74,11 @@ export async function startMulticastStream(
     sourceType: source.type,
     source: sourceValue,
     multicastAddress: address,
+    localAddress: env.MULTICAST_LOCAL_ADDR ?? env.PBX_HOST,
+    audioCodec: env.MULTICAST_AUDIO_CODEC,
     port: MULTICAST_RTP_PORT,
+    rtpPayloadSize: env.MULTICAST_RTP_PAYLOAD_SIZE,
+    ttl: env.MULTICAST_TTL,
   });
 
   activeStreams.set(groupId, {
@@ -71,7 +89,12 @@ export async function startMulticastStream(
 }
 
 export async function stopMulticastStream(groupId: string) {
-  await postToAgent("/multicast/stop", { groupId });
+  try {
+    await postToAgent("/multicast/stop", { groupId }, { timeoutMs: 2000 });
+  } catch (error) {
+    console.warn("Failed to stop multicast agent session", { error, groupId });
+  }
+
   setInactive(groupId, { emitWhenMissing: true });
 }
 

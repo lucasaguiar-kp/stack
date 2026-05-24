@@ -22,6 +22,7 @@ const rawEnv = createEnv({
     APP_GIT_BRANCH: z.string().min(1).optional(),
     APP_CURRENT_COMMIT: z.string().min(1).optional(),
     PBX_HOST: z.string().min(1).optional(),
+    PBX_PROVIDER: z.enum(["asterisk", "freeswitch"]).default("asterisk"),
     MULTICAST_AGENT_HOST: z.string().min(1).default("127.0.0.1"),
     MULTICAST_AGENT_PORT: z.coerce.number().int().positive().default(3010),
     WINDOWS_PROGRAM_FILES_DIR: z.string().min(1).default("C:\\Program Files\\Khomp Stack"),
@@ -50,10 +51,22 @@ const rawEnv = createEnv({
     ASTERISK_PJSIP_TRANSPORT: z.string().min(1).default("transport-udp"),
     ASTERISK_GENERATED_PJSIP_DIR: z.string().min(1).optional(),
     ASTERISK_GENERATED_EXTENSIONS_DIR: z.string().min(1).optional(),
+    FREESWITCH_AUTO_PROVISION: envBoolean.default(false),
+    FREESWITCH_CONFIG_DIR: z.string().min(1).optional(),
+    FREESWITCH_DIALPLAN_DIR: z.string().min(1).optional(),
+    FREESWITCH_DIRECTORY_DIR: z.string().min(1).optional(),
+    FREESWITCH_DOMAIN: z.string().min(1).optional(),
+    FREESWITCH_ESL_HOST: z.string().min(1).optional(),
+    FREESWITCH_ESL_PORT: z.coerce.number().int().positive().default(8021),
+    FREESWITCH_ESL_PASSWORD: z.string().min(1).optional(),
+    FREESWITCH_RTP_END_PORT: z.coerce.number().int().positive().default(10100),
+    FREESWITCH_RTP_START_PORT: z.coerce.number().int().positive().default(10000),
+    FREESWITCH_SIP_PORT: z.coerce.number().int().positive().default(5060),
+    FREESWITCH_WS_PORT: z.coerce.number().int().positive().default(5066),
     MULTICAST_ADDRESS_BASE: z
       .string()
       .regex(/^\d{1,3}\.\d{1,3}\.\d{1,3}$/)
-      .default("224.0.0"),
+      .default("239.255.0"),
     MULTICAST_ADDRESS_START: z.coerce.number().int().min(0).max(255).default(1),
     MULTICAST_ADDRESS_MAX: z.coerce.number().int().min(0).max(255).default(254),
     MULTICAST_RELAY_HOST: z.string().min(1).optional(),
@@ -61,6 +74,7 @@ const rawEnv = createEnv({
     MULTICAST_LOCAL_ADDR: z.string().min(1).optional(),
     MULTICAST_TTL: z.coerce.number().int().min(1).max(255).default(32),
     MULTICAST_RTP_PAYLOAD_SIZE: z.coerce.number().int().positive().default(160),
+    MULTICAST_AUDIO_CODEC: z.enum(["pcma", "pcmu"]).default("pcma"),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
@@ -72,11 +86,15 @@ const resolvedMqttPublicUrl =
   (rawEnv.PBX_HOST ? `mqtt://${rawEnv.PBX_HOST}:${rawEnv.MQTT_BROKER_PORT}` : undefined);
 const resolvedAsteriskAmiHost = rawEnv.ASTERISK_AMI_HOST ?? rawEnv.PBX_HOST;
 const resolvedAsteriskDeviceHost = rawEnv.ASTERISK_DEVICE_HOST ?? rawEnv.PBX_HOST;
+const resolvedFreeSwitchDomain = rawEnv.FREESWITCH_DOMAIN ?? rawEnv.PBX_HOST;
+const resolvedFreeSwitchEslHost = rawEnv.FREESWITCH_ESL_HOST ?? "127.0.0.1";
 
 export const env = {
   ...rawEnv,
   ASTERISK_AMI_HOST: resolvedAsteriskAmiHost,
   ASTERISK_DEVICE_HOST: resolvedAsteriskDeviceHost,
+  FREESWITCH_DOMAIN: resolvedFreeSwitchDomain,
+  FREESWITCH_ESL_HOST: resolvedFreeSwitchEslHost,
   MQTT_BROKER_HOST: resolvedMqttBrokerHost,
   MQTT_PUBLIC_URL: resolvedMqttPublicUrl,
 };

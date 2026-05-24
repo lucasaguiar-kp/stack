@@ -4,7 +4,7 @@ import { and, eq, ne } from "drizzle-orm";
 
 export async function loadActiveDevices() {
   return db.query.device.findMany({
-    where: and(eq(deviceTable.isActive, true), eq(deviceTable.status, "active")),
+    where: eq(deviceTable.isActive, true),
   });
 }
 

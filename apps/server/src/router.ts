@@ -14,6 +14,7 @@ import { executeDeviceCommandRoute } from "./modules/devices/execute-device-comm
 import { getDeviceDetailRoute } from "./modules/devices/get-device-detail/route";
 import { listDevicesRoute } from "./modules/devices/list-devices/route";
 import { syncDeviceRoute } from "./modules/devices/sync-device/route";
+import { syncNetworkDevicesRoute } from "./modules/devices/sync-network/route";
 import { updateDeviceRoute } from "./modules/devices/update-device/route";
 import { updateDeviceConfigRoute } from "./modules/devices/update-device-config/route";
 import { getUserConnectionInfoRoute } from "./modules/users/get-connection-info/route";
@@ -53,6 +54,7 @@ export const appRouter = {
     updateConfig: updateDeviceConfigRoute,
     command: executeDeviceCommandRoute,
     sync: syncDeviceRoute,
+    syncNetwork: syncNetworkDevicesRoute,
     delete: deleteDeviceRoute,
   },
 };

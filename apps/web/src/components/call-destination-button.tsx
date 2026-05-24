@@ -22,7 +22,7 @@ export function CallDestinationButton({
         !destination ||
         !browserPhone.hasCredentials ||
         !browserPhone.isSecureContext ||
-        (browserPhone.status !== "registered" && browserPhone.status !== "idle")
+        browserPhone.status !== "registered"
       }
       onClick={() => {
         if (!destination) {

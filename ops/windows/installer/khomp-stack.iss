@@ -14,6 +14,73 @@
   #define AppVersion "0.1.0"
 #endif
 
+#ifnexist BundleRoot + "app\" + DesktopExecutableName
+  #error "Missing required bundle file: " + BundleRoot + "app\" + DesktopExecutableName + ". Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "app\resources"
+  #error "Missing required bundle directory: " + BundleRoot + "app\resources. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "backend\server.exe"
+  #error "Missing required bundle file: " + BundleRoot + "backend\server.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ingest\ingest.exe"
+  #error "Missing required bundle file: " + BundleRoot + "ingest\ingest.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "multicast-agent\multicast-agent.exe"
+  #error "Missing required bundle file: " + BundleRoot + "multicast-agent\multicast-agent.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ffmpeg\ffmpeg.exe"
+  #error "Missing required bundle file: " + BundleRoot + "ffmpeg\ffmpeg.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "freeswitch\FreeSwitchConsole.exe"
+  #error "Missing required bundle file: " + BundleRoot + "freeswitch\FreeSwitchConsole.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "freeswitch\mod\mod_conference.dll"
+  #error "Missing required bundle file: " + BundleRoot + "freeswitch\mod\mod_conference.dll. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "mqtt\mosquitto\mosquitto.exe"
+  #error "Missing required bundle file: " + BundleRoot + "mqtt\mosquitto\mosquitto.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "mqtt\mosquitto\mosquitto_passwd.exe"
+  #error "Missing required bundle file: " + BundleRoot + "mqtt\mosquitto\mosquitto_passwd.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "vendor\winsw\WinSW-x64.exe"
+  #error "Missing required bundle file: " + BundleRoot + "vendor\winsw\WinSW-x64.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "vendor\postgresql\postgresql-16.13-3-windows-x64.exe"
+  #error "Missing required bundle file: " + BundleRoot + "vendor\postgresql\postgresql-16.13-3-windows-x64.exe. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\scripts\bootstrap-config.ps1"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\scripts\bootstrap-config.ps1. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\scripts\init-postgres.ps1"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\scripts\init-postgres.ps1. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\scripts\install-services.ps1"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\scripts\install-services.ps1. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\scripts\uninstall-services.ps1"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\scripts\uninstall-services.ps1. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\db\schema.sql"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\db\schema.sql. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\winsw\backend.xml"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\winsw\backend.xml. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\winsw\freeswitch.xml"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\winsw\freeswitch.xml. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\winsw\ingest.xml"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\winsw\ingest.xml. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\winsw\mqtt.xml"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\winsw\mqtt.xml. Stage the full Windows bundle before compiling the installer."
+#endif
+#ifnexist BundleRoot + "ops\windows\winsw\multicast-agent.xml"
+  #error "Missing required bundle file: " + BundleRoot + "ops\windows\winsw\multicast-agent.xml. Stage the full Windows bundle before compiling the installer."
+#endif
+
 [Setup]
 AppId={{8A4E8AA8-34A2-4CE8-9C78-1F9C04F301C7}
 AppName=Khomp Stack
@@ -59,16 +126,15 @@ Source: "{#BundleRoot}\backend\*"; DestDir: "{app}\backend"; Flags: ignoreversio
 Source: "{#BundleRoot}\ingest\*"; DestDir: "{app}\ingest"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#BundleRoot}\multicast-agent\*"; DestDir: "{app}\multicast-agent"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#BundleRoot}\ffmpeg\*"; DestDir: "{app}\ffmpeg"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#BundleRoot}\freeswitch\*"; DestDir: "{app}\freeswitch"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#BundleRoot}\vendor\winsw\*"; DestDir: "{app}\vendor\winsw"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#BundleRoot}\vendor\postgresql\*"; DestDir: "{app}\vendor\postgresql"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#BundleRoot}\ops\windows\scripts\*"; DestDir: "{app}\ops\windows\scripts"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#BundleRoot}\ops\windows\winsw\*"; DestDir: "{app}\ops\windows\winsw"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#BundleRoot}\ops\windows\db\*"; DestDir: "{app}\ops\windows\db"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Optional infrastructure payload. The installer copies it when staged, but the
-; current installer release only registers backend, ingest, and multicast-agent.
-; Asterisk, MQTT, and Postgres stay as carry-through payload until their Windows
-; service wrappers are versioned in the same flow.
-Source: "{#BundleRoot}\asterisk\*"; DestDir: "{app}\asterisk"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
-Source: "{#BundleRoot}\mqtt\*"; DestDir: "{app}\mqtt"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+; Required local infrastructure payloads.
+Source: "{#BundleRoot}\mqtt\*"; DestDir: "{app}\mqtt"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#BundleRoot}\postgres\*"; DestDir: "{app}\postgres"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
@@ -94,61 +160,50 @@ Filename: "powershell.exe"; \
 Type: filesandordirs; Name: "{app}\services"
 
 [Code]
-function BundleFilePath(RelativePath: string): string;
+function PowerShellSingleQuote(Value: string): string;
 begin
-  Result := ExpandConstant('{#BundleRoot}\' + RelativePath);
+  StringChangeEx(Value, '''', '''''', True);
+  Result := '''' + Value + '''';
 end;
 
-function EnsureBundleFile(RelativePath: string): Boolean;
+procedure StopRunningKhompProcesses();
 var
-  FullPath: string;
+  ResultCode: Integer;
+  InstallRoot: string;
+  Command: string;
 begin
-  FullPath := BundleFilePath(RelativePath);
-  Result := FileExists(FullPath);
+  InstallRoot := ExpandConstant('{app}');
 
-  if not Result then
+  if not DirExists(InstallRoot) then
   begin
-    MsgBox(
-      'Missing required bundle file:' + #13#10 + FullPath + #13#10 + #13#10 +
-      'Stage the full Windows bundle before compiling the installer.',
-      mbCriticalError,
-      MB_OK
-    );
+    exit;
   end;
+
+  WizardForm.StatusLabel.Caption := 'Stopping Khomp Stack background services...';
+
+  Command :=
+    '-NoProfile -ExecutionPolicy Bypass -Command "' +
+    '$ErrorActionPreference = ''SilentlyContinue''; ' +
+    '$serviceNames = @(''KhompStack-MulticastAgent'', ''KhompStack-Ingest'', ''KhompStack-Backend'', ''KhompStack-FreeSWITCH'', ''KhompStack-Asterisk'', ''KhompStack-Mqtt''); ' +
+    'foreach ($name in $serviceNames) { ' +
+    '  $svc = Get-Service -Name $name -ErrorAction SilentlyContinue; ' +
+    '  if ($svc) { ' +
+    '    Stop-Service -Name $name -Force -ErrorAction SilentlyContinue; ' +
+    '    try { (Get-Service -Name $name).WaitForStatus(''Stopped'', ''00:00:30'') } catch {} ' +
+    '  } ' +
+    '}; ' +
+    '$root = ' + PowerShellSingleQuote(InstallRoot) + '; ' +
+    'Get-CimInstance Win32_Process | Where-Object { ' +
+    '  $_.ExecutablePath -and $_.ExecutablePath.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase) ' +
+    '} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"';
+
+  Exec('powershell.exe', Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
-function EnsureBundleDirectory(RelativePath: string): Boolean;
-var
-  FullPath: string;
+procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  FullPath := BundleFilePath(RelativePath);
-  Result := DirExists(FullPath);
-
-  if not Result then
+  if CurStep = ssInstall then
   begin
-    MsgBox(
-      'Missing required bundle directory:' + #13#10 + FullPath + #13#10 + #13#10 +
-      'Stage the full Windows bundle before compiling the installer.',
-      mbCriticalError,
-      MB_OK
-    );
+    StopRunningKhompProcesses();
   end;
-end;
-
-function InitializeSetup(): Boolean;
-begin
-  Result :=
-    EnsureBundleFile('app\{#DesktopExecutableName}') and
-    EnsureBundleDirectory('app\resources') and
-    EnsureBundleFile('backend\server.exe') and
-    EnsureBundleFile('ingest\ingest.exe') and
-    EnsureBundleFile('multicast-agent\multicast-agent.exe') and
-    EnsureBundleFile('ffmpeg\ffmpeg.exe') and
-    EnsureBundleFile('vendor\winsw\WinSW-x64.exe') and
-    EnsureBundleFile('ops\windows\scripts\bootstrap-config.ps1') and
-    EnsureBundleFile('ops\windows\scripts\install-services.ps1') and
-    EnsureBundleFile('ops\windows\scripts\uninstall-services.ps1') and
-    EnsureBundleFile('ops\windows\winsw\backend.xml') and
-    EnsureBundleFile('ops\windows\winsw\ingest.xml') and
-    EnsureBundleFile('ops\windows\winsw\multicast-agent.xml');
 end;

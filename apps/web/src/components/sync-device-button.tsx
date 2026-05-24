@@ -15,7 +15,10 @@ export function SyncDeviceButton({ deviceId }: { deviceId: string }) {
           return;
         }
 
-        toast.error("Falha ao sincronizar device");
+        toast.error(
+          device.syncMessage ??
+            "Nao foi possivel estabelecer conexao com o device. Ele pode estar desligado ou o IP salvo pode ter mudado via DHCP.",
+        );
       },
       onError: (error) => toast.error(error.message),
     }),

@@ -20,6 +20,11 @@ export const getUserConnectionInfoOutputSchema = z.object({
     password: z.string(),
     tlsEnabled: z.boolean(),
   }),
+  network: z.object({
+    configuredHost: z.string(),
+    currentHost: z.string(),
+    hostChanged: z.boolean(),
+  }),
 });
 
 export type Input = z.infer<typeof getUserConnectionInfoSchema>;

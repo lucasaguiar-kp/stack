@@ -1,9 +1,8 @@
 import { db } from "@stack-pbx/db";
-import { buildGroupScopedSipUser } from "./sip-identity";
 
 const DEVICE_EXTENSION_START = 201;
 
-export async function allocateDevicePbxIdentity(input: {
+export async function allocateDevicePbxIdentity(_input: {
   groupKey: string;
 }) {
   const [devices, groups, users] = await Promise.all([
@@ -46,9 +45,6 @@ export async function allocateDevicePbxIdentity(input: {
 
   return {
     extension,
-    sipUser: buildGroupScopedSipUser({
-      groupKey: input.groupKey,
-      extension,
-    }),
+    sipUser: extension,
   };
 }

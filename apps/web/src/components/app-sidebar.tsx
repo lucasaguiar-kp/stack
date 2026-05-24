@@ -1,6 +1,8 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import {
+  AlertTriangle,
   Building2,
   LayoutDashboard,
   Layers3,
@@ -13,10 +15,12 @@ import {
   Server,
   Wifi,
   Info,
+  RefreshCcw,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -41,7 +45,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
-import { orpc } from "@/utils/orpc";
+import { orpc, queryClient } from "@/utils/orpc";
+import { toast } from "sonner";
 
 const dashboardNav = [
   {
@@ -68,12 +73,44 @@ export function AppSidebar() {
   const { isMobile } = useSidebar();
   const { setTheme, theme } = useTheme();
   const navigate = useNavigate();
+  const lastAutoSyncedHostRef = useRef<string | null>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { data: session } = authClient.useSession();
   const connectionInfo = useQuery({
     ...orpc.user.connectionInfo.queryOptions({ input: undefined }),
     enabled: Boolean(session?.user),
   });
+  const syncNetworkDevices = useMutation(
+    orpc.device.syncNetwork.mutationOptions({
+      onSuccess: async (result) => {
+        await queryClient.invalidateQueries();
+
+        if (result.failed > 0) {
+          toast.warning(
+            `Rede atualizada em ${result.synced} device(s). ${result.failed} falharam porque podem estar desligados ou com IP DHCP alterado.`,
+          );
+          return;
+        }
+
+        toast.success(`Rede atualizada em ${result.synced} device(s).`);
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const networkInfo = connectionInfo.data?.network;
+
+  useEffect(() => {
+    if (!networkInfo?.hostChanged || syncNetworkDevices.isPending) {
+      return;
+    }
+
+    if (lastAutoSyncedHostRef.current === networkInfo.currentHost) {
+      return;
+    }
+
+    lastAutoSyncedHostRef.current = networkInfo.currentHost;
+    syncNetworkDevices.mutate({});
+  }, [networkInfo?.currentHost, networkInfo?.hostChanged, syncNetworkDevices]);
 
   const userName = session?.user?.name ?? session?.user?.email ?? "Usuário";
   const userEmail = session?.user?.email ?? "";
@@ -234,6 +271,40 @@ export function AppSidebar() {
                 <span>Broker MQTT não configurado.</span>
               </div>
             )}
+            {networkInfo ? (
+              <>
+                <SidebarSeparator className="mx-0 my-3" />
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sidebar-foreground/70">IP deste PC</span>
+                    <span className="truncate font-mono">{networkInfo.currentHost}</span>
+                  </div>
+                  {networkInfo.hostChanged ? (
+                    <div className="border-warning/30 bg-warning/10 text-warning rounded border p-2">
+                      <div className="mb-2 flex gap-1.5">
+                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                        <span>
+                          O IP do PC mudou. Ressincronize para enviar o novo broker/PBX aos
+                          devices.
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 w-full gap-1.5 text-xs"
+                        disabled={syncNetworkDevices.isPending}
+                        onClick={() => syncNetworkDevices.mutate({})}
+                      >
+                        <RefreshCcw
+                          className={`size-3 ${syncNetworkDevices.isPending ? "animate-spin" : ""}`}
+                        />
+                        Sincronizar rede
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
           </div>
         </SidebarGroup>
       </SidebarContent>

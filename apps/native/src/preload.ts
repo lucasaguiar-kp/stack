@@ -22,18 +22,16 @@ type DesktopApi = {
   getServiceStatus: (serviceName: string) => Promise<DesktopServiceStatus>;
 };
 
-const loadElectron = new Function(
-  'return import("electron")',
-) as () => Promise<{
+declare const require: (moduleName: string) => {
   contextBridge: {
     exposeInMainWorld: (key: string, api: DesktopApi) => void;
   };
   ipcRenderer: {
     invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
   };
-}>;
+};
 
-const electron = await loadElectron();
+const electron = require("electron");
 
 const desktopApi: DesktopApi = {
   getRuntimeInfo: async () =>

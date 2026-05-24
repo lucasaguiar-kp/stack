@@ -44,7 +44,11 @@ describe("backend multicast agent delegation", () => {
         sourceType: "radio_url",
         source: "https://example.com/live",
         multicastAddress: "224.0.0.1",
+        localAddress: "172.30.254.26",
+        audioCodec: "pcmu",
         port: MULTICAST_RTP_PORT,
+        rtpPayloadSize: 160,
+        ttl: 32,
       }),
     });
   });

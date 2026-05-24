@@ -178,7 +178,12 @@ export async function stopGroupMulticast(input: StopGroupMulticastInput) {
 
   await stopMulticastStream(input.groupId);
 
-  await sendMulticastMqttToDevices(input.groupId, input.requesterId, group.multicastAddress, []);
+  void sendMulticastMqttToDevices(input.groupId, input.requesterId, group.multicastAddress, []).catch((error) => {
+    console.warn("Failed to publish multicast stop config to devices", {
+      error,
+      groupId: input.groupId,
+    });
+  });
 }
 
 export async function getGroupMulticastStatus(

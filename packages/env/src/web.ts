@@ -17,7 +17,7 @@ const rawEnv = createEnv({
 
 const resolvedAsteriskWsUrl =
   rawEnv.VITE_ASTERISK_WS_URL ??
-  (rawEnv.VITE_PBX_HOST ? `ws://${rawEnv.VITE_PBX_HOST}:8088/ws` : undefined);
+  (rawEnv.VITE_PBX_HOST ? `ws://${rawEnv.VITE_PBX_HOST}:5066` : undefined);
 const resolvedAsteriskSipDomain = rawEnv.VITE_ASTERISK_SIP_DOMAIN ?? rawEnv.VITE_PBX_HOST;
 const resolvedMqttPublicUrl =
   rawEnv.VITE_MQTT_PUBLIC_URL ??

@@ -35,13 +35,14 @@ export async function syncDevice(input: Input): Promise<Output> {
     .update(deviceTable)
     .set({
       status: "provisioning",
-      connectionStatus: "unknown",
       isActive: true,
     })
     .where(eq(deviceTable.id, device.id))
     .returning();
 
   const currentDevice = provisioningDevice ?? device;
+  let mqttProvisioned = false;
+  let syncMessage: string | undefined;
 
   try {
     await provisionDeviceInAsterisk({
@@ -55,16 +56,32 @@ export async function syncDevice(input: Input): Promise<Output> {
     });
 
     if (currentDevice.macAddress) {
-      await provisionDeviceOverMqtt({
-        extension: currentDevice.extension,
-        sipUser: currentDevice.sipUser,
-        deviceIp: currentDevice.deviceIp,
-        macAddress: currentDevice.macAddress,
-        sipPassword: currentDevice.sipPassword,
-      });
+      try {
+        await provisionDeviceOverMqtt({
+          extension: currentDevice.extension,
+          sipUser: currentDevice.sipUser,
+          deviceIp: currentDevice.deviceIp,
+          macAddress: currentDevice.macAddress,
+          sipPassword: currentDevice.sipPassword,
+        });
+        mqttProvisioned = true;
+      } catch (error) {
+        syncMessage =
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel conectar no device pelo IP salvo. O device pode estar desligado ou pode ter recebido outro IP via DHCP.";
+        console.warn("Device HTTPS/MQTT provisioning did not complete before SIP check", {
+          deviceId: currentDevice.id,
+          error,
+        });
+      }
     }
 
-    await waitForDeviceRegistrationInAsterisk({ sipUser: currentDevice.sipUser });
+    await waitForDeviceRegistrationInAsterisk({
+      deviceIp: currentDevice.deviceIp,
+      extension: currentDevice.extension,
+      sipUser: currentDevice.sipUser,
+    });
 
     const [activeDevice] = await db
       .update(deviceTable)
@@ -79,7 +96,18 @@ export async function syncDevice(input: Input): Promise<Output> {
     }
 
     return activeDevice;
-  } catch {
+  } catch (error) {
+    syncMessage =
+      syncMessage ??
+      (error instanceof Error
+        ? error.message
+        : "Nao foi possivel concluir a sincronizacao do device.");
+    console.error("Device sync failed", {
+      deviceId: currentDevice.id,
+      error,
+      mqttProvisioned,
+    });
+
     const [failedDevice] = await db
       .update(deviceTable)
       .set({
@@ -88,6 +116,9 @@ export async function syncDevice(input: Input): Promise<Output> {
       .where(eq(deviceTable.id, currentDevice.id))
       .returning();
 
-    return failedDevice ?? currentDevice;
+    return {
+      ...(failedDevice ?? currentDevice),
+      syncMessage,
+    };
   }
 }

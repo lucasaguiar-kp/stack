@@ -1,0 +1,74 @@
+name: Build Windows Artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+env:
+  BUN_VERSION: 1.3.9
+  FREESWITCH_VERSION: 1.10.12
+  FREESWITCH_MSI_URL: http://files.freeswitch.org/windows/installer/x64/FreeSWITCH-1.10.12-Release-x64.msi
+  FFMPEG_ZIP_URL: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+
+jobs:
+  build-windows:
+    name: Build Windows executables
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check types
+        run: bun run check-types
+
+      - name: Build server executable
+        run: bun run --cwd apps/server compile
+
+      - name: Build ingest executable
+        run: bun run --cwd apps/ingest build
+
+      - name: Build multicast agent executable
+        run: bun run --cwd apps/multicast-agent build
+
+      - name: Download Windows runtime dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          New-Item -ItemType Directory -Force -Path ".runtime\freeswitch", ".runtime\ffmpeg" | Out-Null
+
+          Invoke-WebRequest -Uri "${env:FREESWITCH_MSI_URL}" -OutFile ".runtime\freeswitch\FreeSWITCH-${env:FREESWITCH_VERSION}-Release-x64.msi"
+          Invoke-WebRequest -Uri "${env:FFMPEG_ZIP_URL}" -OutFile ".runtime\ffmpeg\ffmpeg-release-essentials.zip"
+
+          Expand-Archive ".runtime\ffmpeg\ffmpeg-release-essentials.zip" ".runtime\ffmpeg" -Force
+          $ffmpegBin = Get-ChildItem ".runtime\ffmpeg" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          if ($null -eq $ffmpegBin) {
+            throw "ffmpeg.exe was not found after extracting the FFmpeg archive."
+          }
+
+          New-Item -ItemType Directory -Force -Path "artifacts\windows\bin", "artifacts\windows\runtime\freeswitch", "artifacts\windows\runtime\ffmpeg" | Out-Null
+          Copy-Item "apps\server\server.exe" "artifacts\windows\bin\server.exe"
+          Copy-Item "apps\ingest\ingest.exe" "artifacts\windows\bin\ingest.exe"
+          Copy-Item "apps\multicast-agent\multicast-agent.exe" "artifacts\windows\bin\multicast-agent.exe"
+          Copy-Item ".runtime\freeswitch\FreeSWITCH-${env:FREESWITCH_VERSION}-Release-x64.msi" "artifacts\windows\runtime\freeswitch\"
+          Copy-Item $ffmpegBin.FullName "artifacts\windows\runtime\ffmpeg\ffmpeg.exe"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-pbx-windows
+          path: artifacts/windows
+          if-no-files-found: error

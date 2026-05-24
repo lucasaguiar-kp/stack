@@ -1,15 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import {
-  Eye,
-  EyeOff,
-  Menu,
-  Mic,
-  Phone,
-  Settings,
-  Wifi,
-  WifiOff,
-  X,
-} from "lucide-react";
+import { Eye, EyeOff, Menu, Mic, Phone, Settings, Wifi, WifiOff, X } from "lucide-react";
 import { useState } from "react";
 import { CallDestinationButton } from "@/components/call-destination-button";
 import { DeviceAudioRecordDialog } from "@/components/device-detail/device-audio-record-dialog";
@@ -41,15 +31,15 @@ export function DeviceDetailPage({
   }
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full min-w-0 flex-col gap-6">
       <div className="border-border/40 bg-card flex flex-wrap items-center gap-4 rounded-xl border px-5 py-5">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-lg">
             <Settings className="size-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold">{device.name}</h1>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="truncate text-lg font-bold">{device.name}</h1>
               <span className={`flex items-center gap-1 ${viewModel.statusColor}`}>
                 {device.connectionStatus === "online" ? (
                   <Wifi className="size-3.5" />
@@ -59,7 +49,7 @@ export function DeviceDetailPage({
                 <span className="text-xs font-medium">{device.connectionStatus}</span>
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <Badge variant="secondary" className="text-[10px]">
                 {device.groupName}
               </Badge>
@@ -71,7 +61,7 @@ export function DeviceDetailPage({
             </div>
           </div>
         </div>
-        <div className="ml-auto hidden items-center gap-2 md:flex">
+        <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 md:flex">
           <Button
             type="button"
             variant={viewModel.previewEnabled ? "default" : "outline"}

@@ -257,11 +257,11 @@ export function DeviceDetailContent({
       value={activeTab}
       defaultValue="estado"
       onValueChange={onTabChange}
-      className="flex h-full flex-col"
+      className="flex h-full min-w-0 flex-col"
     >
-      <div className="border-border/40 border-b px-6 pt-2">
-        <ScrollArea className="h-10">
-          <TabsList variant="line" className="gap-0">
+      <div className="border-border/40 min-w-0 border-b px-6 pt-2">
+        <ScrollArea className="h-10 w-full">
+          <TabsList variant="line" className="min-w-max gap-0">
             {deviceDetailTabs.map((tab) => (
               <TabsTrigger
                 key={tab.value}
@@ -277,7 +277,7 @@ export function DeviceDetailContent({
         </ScrollArea>
       </div>
 
-      <div className="overflow-y-scroll p-6 pb-24">
+      <div className="min-w-0 overflow-y-scroll p-6 pb-24">
         {/* ── Estado ────────────────────────────────────── */}
         <TabsContent value="estado">
           <div className="grid gap-4 xl:grid-cols-3">

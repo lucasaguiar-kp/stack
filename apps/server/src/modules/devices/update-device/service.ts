@@ -4,7 +4,6 @@ import { and, eq } from "drizzle-orm";
 import { AppError } from "../../../core/errors/app-error";
 import { provisionDeviceInAsterisk, syncGroupDialplanInAsterisk } from "../_shared/asterisk-provisioning";
 import { provisionDeviceOverMqtt } from "../_shared/mqtt-provisioning";
-import { buildGroupScopedSipUser } from "../_shared/sip-identity";
 import type { Input } from "./schema";
 
 export async function updateDevice(input: Input): Promise<void> {
@@ -33,10 +32,7 @@ export async function updateDevice(input: Input): Promise<void> {
   }
 
   const previousGroupId = device.groupId;
-  const sipUser = buildGroupScopedSipUser({
-    groupKey: targetGroup.extension ?? targetGroup.id,
-    extension: device.extension,
-  });
+  const sipUser = device.extension;
 
   const [updated] = await db
     .update(deviceTable)

@@ -372,7 +372,7 @@ export function buildNetworkAdvancedBaseline(detail: DeviceDetailData): NetworkA
   const liveNetwork = detail.live?.network;
   return {
     httpApiTokenEnabled: persisted?.httpApiTokenEnabled ?? liveNetwork?.http_token_enabled ?? true,
-    ipAnnouncementEnabled: persisted?.ipAnnouncementEnabled ?? liveNetwork?.vocalize_ip ?? false,
+    ipAnnouncementEnabled: persisted?.ipAnnouncementEnabled ?? liveNetwork?.vocalize_ip ?? true,
   };
 }
 

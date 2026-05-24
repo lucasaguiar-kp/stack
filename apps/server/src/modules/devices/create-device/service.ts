@@ -11,14 +11,12 @@ import {
   provisionDeviceInAsterisk,
   waitForDeviceRegistrationInAsterisk,
 } from "../_shared/asterisk-provisioning";
-import { markDeviceOnlineByTopic } from "../_shared/device-presence";
 import {
   buildDeviceTopicBase,
   normalizeDeviceMacAddress,
   provisionDeviceOverMqtt,
 } from "../_shared/mqtt-provisioning";
 import { allocateDevicePbxIdentity } from "../_shared/pbx";
-import { buildGroupScopedSipUser } from "../_shared/sip-identity";
 import type { Input } from "./schema";
 
 function isUniqueViolation(error: unknown): error is {
@@ -63,10 +61,7 @@ export async function createDevice(input: Input): Promise<void> {
     }
 
     extension = existingDevice.extension;
-    sipUser = buildGroupScopedSipUser({
-      groupKey: group.extension ?? group.id,
-      extension,
-    });
+    sipUser = extension;
     sipPassword = existingDevice.sipPassword;
 
     [created] = await db
@@ -123,52 +118,62 @@ export async function createDevice(input: Input): Promise<void> {
     throw new AppError("DEVICE_CREATION_FAILED");
   }
 
-  let mqttProvisioned = false;
+  void (async () => {
+    let mqttProvisioned = false;
 
-  try {
-    await provisionDeviceInAsterisk({
-      groupId: group.id,
-      sipUser,
-      extension,
-      mqttTopic,
-      sipPassword,
-      deviceId: created.id,
-      deviceName: input.name,
-    });
+    try {
+      await provisionDeviceInAsterisk({
+        groupId: group.id,
+        sipUser,
+        extension,
+        mqttTopic,
+        sipPassword,
+        deviceId: created.id,
+        deviceName: input.name,
+      });
 
-    await provisionDeviceOverMqtt({
-      extension,
-      sipUser,
-      deviceIp: created.deviceIp ?? input.deviceIp,
-      macAddress,
-      sipPassword,
-    });
-    mqttProvisioned = true;
-    await markDeviceOnlineByTopic(mqttTopic);
+      try {
+        await provisionDeviceOverMqtt({
+          extension,
+          sipUser,
+          deviceIp: created.deviceIp ?? input.deviceIp,
+          macAddress,
+          sipPassword,
+        });
+        mqttProvisioned = true;
+      } catch (error) {
+        console.warn("Device HTTPS/MQTT provisioning did not complete before SIP check", {
+          deviceId: created.id,
+          error,
+        });
+      }
 
-    await waitForDeviceRegistrationInAsterisk({ sipUser });
-    await db
-      .update(deviceTable)
-      .set({
-        connectionStatus: "online",
-        lastSeenAt: new Date(),
-        status: "active",
-      })
-      .where(eq(deviceTable.id, created.id));
-  } catch (error) {
-    console.error("Device provisioning failed", {
-      deviceId: created.id,
-      mqttProvisioned,
-      error,
-    });
+      await waitForDeviceRegistrationInAsterisk({
+        deviceIp: created.deviceIp ?? input.deviceIp,
+        extension,
+        sipUser,
+      });
+      await db
+        .update(deviceTable)
+        .set({
+          connectionStatus: "online",
+          lastSeenAt: new Date(),
+          status: "active",
+        })
+        .where(eq(deviceTable.id, created.id));
+    } catch (error) {
+      console.error("Device provisioning failed", {
+        deviceId: created.id,
+        mqttProvisioned,
+        error,
+      });
 
-    await db
-      .update(deviceTable)
-      .set({
-        connectionStatus: mqttProvisioned ? "online" : "unknown",
-        lastSeenAt: mqttProvisioned ? new Date() : null,
-        status: "failed",
-      })
-      .where(eq(deviceTable.id, created.id));
-  }
+      await db
+        .update(deviceTable)
+        .set({
+          status: "failed",
+        })
+        .where(eq(deviceTable.id, created.id));
+    }
+  })();
 }

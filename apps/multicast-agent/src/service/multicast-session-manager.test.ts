@@ -14,6 +14,7 @@ describe("multicast session manager", () => {
   test("builds ffmpeg args for radio streams", () => {
     expect(
       buildFfmpegArgs({
+        audioCodec: "pcma",
         sourceType: "radio_url",
         source: "https://example.com/live",
       }),
@@ -29,9 +30,19 @@ describe("multicast session manager", () => {
       "-ac",
       "1",
       "-f",
-      "mulaw",
+      "alaw",
       "-",
     ]);
+  });
+
+  test("builds ffmpeg args for mu-law streams", () => {
+    expect(
+      buildFfmpegArgs({
+        audioCodec: "pcmu",
+        sourceType: "radio_url",
+        source: "https://example.com/live",
+      }),
+    ).toContain("mulaw");
   });
 
   test("builds ffmpeg args for file sources with pacing", () => {
@@ -52,17 +63,22 @@ describe("multicast session manager", () => {
       "-ac",
       "1",
       "-f",
-      "mulaw",
+      "alaw",
       "-",
     ]);
   });
 
   test("builds sender args for stdin mode", () => {
-    expect(buildSenderArgs("224.0.0.1", 16384)).toEqual([
-      "/Users/lucasaguiar/www/kp/stack-pbx/apps/multicast-agent/src/service/rtp-sender.cjs",
-      "224.0.0.1",
-      "16384",
-    ]);
+    const args = buildSenderArgs({
+      localAddress: "172.30.254.26",
+      multicastAddress: "239.255.0.1",
+      port: 16384,
+      rtpPayloadSize: 160,
+      ttl: 32,
+    });
+
+    expect(args[0]?.endsWith("rtp-sender.cjs")).toBe(true);
+    expect(args.slice(1)).toEqual(["239.255.0.1", "16384", "172.30.254.26", "32", "160", "pcma"]);
   });
 
   test("starts and stops a multicast session", async () => {
@@ -112,9 +128,12 @@ describe("multicast session manager", () => {
       groupId: "group-1",
       sourceType: "radio_url",
       source: "https://example.com/live",
-      multicastAddress: "224.0.0.1",
+      localAddress: "172.30.254.26",
+      multicastAddress: "239.255.0.1",
       port: 16384,
       ffmpegPath: "ffmpeg-path",
+      rtpPayloadSize: 160,
+      ttl: 32,
     });
 
     senderProcess.emit("spawn");
@@ -168,9 +187,12 @@ describe("multicast session manager", () => {
       groupId: "group-err",
       sourceType: "audio_file",
       source: "/tmp/audio.wav",
-      multicastAddress: "224.0.0.1",
+      localAddress: "172.30.254.26",
+      multicastAddress: "239.255.0.1",
       port: 16384,
       ffmpegPath: "missing-ffmpeg",
+      rtpPayloadSize: 160,
+      ttl: 32,
     });
 
     senderProcess.emit("spawn");
@@ -217,9 +239,12 @@ describe("multicast session manager", () => {
       groupId: "group-status",
       sourceType: "radio_url",
       source: "https://example.com/live",
-      multicastAddress: "224.0.0.1",
+      localAddress: "172.30.254.26",
+      multicastAddress: "239.255.0.1",
       port: 16384,
       ffmpegPath: "ffmpeg-path",
+      rtpPayloadSize: 160,
+      ttl: 32,
     });
 
     senderProcess.emit("spawn");
@@ -273,9 +298,12 @@ describe("multicast session manager", () => {
       groupId: "group-cleanup",
       sourceType: "audio_file",
       source: stagedAudioPath,
-      multicastAddress: "224.0.0.1",
+      localAddress: "172.30.254.26",
+      multicastAddress: "239.255.0.1",
       port: 16384,
       ffmpegPath: "ffmpeg-path",
+      rtpPayloadSize: 160,
+      ttl: 32,
     });
 
     senderProcess.emit("spawn");
@@ -305,7 +333,7 @@ describe("multicast session manager", () => {
         groupId: "group-1",
         sourceType: "audio_file",
         source: "/tmp/audio.wav",
-        multicastAddress: "224.0.0.1",
+        multicastAddress: "239.255.0.1",
         port: 16384,
       }),
     });

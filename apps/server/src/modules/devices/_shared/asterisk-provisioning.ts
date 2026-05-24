@@ -10,6 +10,14 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { AppError } from "../../../core/errors/app-error";
+import {
+  provisionDeviceInFreeSwitch,
+  provisionUserInFreeSwitch,
+  removeDeviceFromFreeSwitch,
+  syncGroupDialplanInFreeSwitch,
+  userFreeSwitchConfigNeedsReprovision,
+  waitForDeviceRegistrationInFreeSwitch,
+} from "./freeswitch-provisioning";
 import { sanitizeSipToken } from "./sip-identity";
 
 const workspaceRoot = process.cwd();
@@ -99,6 +107,10 @@ export function buildPjsipEndpointName(input: { sipUser: string }) {
 }
 
 export async function userPjsipConfigNeedsReprovision(userId: string) {
+  if (env.PBX_PROVIDER === "freeswitch") {
+    return userFreeSwitchConfigNeedsReprovision(userId);
+  }
+
   const pjsipFilePath = path.join(getPjsipDevicesDir(), `${userId}.conf`);
 
   try {
@@ -469,9 +481,15 @@ async function writePjsipTransportConfig() {
 }
 
 export async function waitForDeviceRegistrationInAsterisk(input: {
+  deviceIp?: string | null;
+  extension?: string;
   sipUser: string;
   timeoutMs?: number;
 }) {
+  if (env.PBX_PROVIDER === "freeswitch") {
+    return waitForDeviceRegistrationInFreeSwitch(input);
+  }
+
   if (!env.ASTERISK_AUTO_PROVISION) {
     return;
   }
@@ -498,6 +516,10 @@ export async function waitForDeviceRegistrationInAsterisk(input: {
 }
 
 export async function provisionDeviceInAsterisk(input: ProvisionDeviceInput) {
+  if (env.PBX_PROVIDER === "freeswitch") {
+    return provisionDeviceInFreeSwitch(input);
+  }
+
   if (!env.ASTERISK_AUTO_PROVISION) {
     return;
   }
@@ -555,6 +577,10 @@ export async function provisionDeviceInAsterisk(input: ProvisionDeviceInput) {
 }
 
 export async function provisionUserInAsterisk(input: ProvisionUserInput) {
+  if (env.PBX_PROVIDER === "freeswitch") {
+    return provisionUserInFreeSwitch(input);
+  }
+
   if (!env.ASTERISK_AUTO_PROVISION) {
     return;
   }
@@ -586,6 +612,10 @@ export async function provisionUserInAsterisk(input: ProvisionUserInput) {
 }
 
 export async function removeDeviceFromAsterisk(input: { deviceId: string }) {
+  if (env.PBX_PROVIDER === "freeswitch") {
+    return removeDeviceFromFreeSwitch(input);
+  }
+
   if (!env.ASTERISK_AUTO_PROVISION) {
     return;
   }
@@ -606,6 +636,10 @@ export async function removeDeviceFromAsterisk(input: { deviceId: string }) {
 }
 
 export async function syncGroupDialplanInAsterisk(groupId: string) {
+  if (env.PBX_PROVIDER === "freeswitch") {
+    return syncGroupDialplanInFreeSwitch(groupId);
+  }
+
   if (!env.ASTERISK_AUTO_PROVISION) {
     return;
   }

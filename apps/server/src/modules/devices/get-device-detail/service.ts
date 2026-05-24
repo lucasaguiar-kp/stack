@@ -1,4 +1,6 @@
 import { db } from "@stack-pbx/db";
+import { device as deviceTable } from "@stack-pbx/db/schema/index";
+import { eq } from "drizzle-orm";
 import { getAuthorizedDeviceOrThrow } from "../_shared/device-access";
 import {
   createDefaultDeviceConfig,
@@ -198,12 +200,24 @@ export async function getDeviceDetail(input: Input): Promise<Output> {
     mqttConfigsResult?.status === "fulfilled" ? mqttConfigsResult.value.params : undefined;
   const mqttAudios =
     mqttAudiosResult?.status === "fulfilled" ? mqttAudiosResult.value.params : undefined;
+  const liveDeviceIp = mqttConfigs?.network?.ip_address?.trim();
+  const resolvedDevice =
+    liveDeviceIp && liveDeviceIp !== device.deviceIp
+      ? ((await db
+          .update(deviceTable)
+          .set({
+            deviceIp: liveDeviceIp,
+          })
+          .where(eq(deviceTable.id, device.id))
+          .returning()
+          .then((rows) => rows[0])) ?? device)
+      : device;
   const config = buildResolvedConfig({
     device: {
-      extension: device.extension,
-      mqttTopic: device.mqttTopic,
-      sipPassword: device.sipPassword,
-      sipUser: device.sipUser,
+      extension: resolvedDevice.extension,
+      mqttTopic: resolvedDevice.mqttTopic,
+      sipPassword: resolvedDevice.sipPassword,
+      sipUser: resolvedDevice.sipUser,
     },
     mqttConfigs,
   });
@@ -292,7 +306,7 @@ export async function getDeviceDetail(input: Input): Promise<Output> {
       systemConfig: config.systemConfig ?? {},
     },
     device: {
-      ...device,
+      ...resolvedDevice,
       groupName: group.name,
     },
     live,
